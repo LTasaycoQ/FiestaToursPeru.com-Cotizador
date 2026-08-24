@@ -1,0 +1,400 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Facades\Log;
+
+class Quote extends Model
+{
+    use SoftDeletes;
+
+    protected $table = 'quote';
+    protected $primaryKey = 'id_quote';
+
+    protected $fillable = [
+        'id_client',
+        'id_users',
+        'id_contacts',
+        'name',
+        'quote_number',
+        'correlative',
+        'correlative_assigned_at',
+        'status',
+        'days',
+        'start_date',
+        'end_date',
+        'expiration_date',
+        'passengers_count',
+        'subtotal',
+        'total',
+        'currency',
+        'notes',
+    ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'expiration_date' => 'date',
+        'subtotal' => 'decimal:2',
+        'total' => 'decimal:2',
+        'days' => 'integer',
+        'passengers_count' => 'integer',
+        'correlative_assigned_at' => 'datetime',
+    ];
+
+    // ============================================================
+    // RELACIONES
+    // ============================================================
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'id_client', 'id_client');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'id_users', 'id');
+    }
+
+    public function contact(): BelongsTo
+    {
+        return $this->belongsTo(Contact::class, 'id_contacts', 'id_contacts');
+    }
+
+    public function quoteDays(): HasMany
+    {
+        return $this->hasMany(QuoteDay::class, 'id_quote', 'id_quote')->orderBy('day_number');
+    }
+
+    public function details(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            DetailQuote::class,
+            QuoteDay::class,
+            'id_quote',
+            'id_quote_day',
+            'id_quote',
+            'id_quote_day'
+        );
+    }
+
+    public function accommodations(): HasMany
+    {
+        return $this->hasMany(QuoteAccommodation::class, 'id_quote', 'id_quote');
+    }
+
+    public function accommodationOption1(): HasMany
+    {
+        return $this->accommodations()->where('option_number', 1);
+    }
+
+    public function accommodationOption2(): HasMany
+    {
+        return $this->accommodations()->where('option_number', 2);
+    }
+
+    // ============================================================
+    // MÉTODOS DE ITINERARIO
+    // ============================================================
+
+    public function generateItineraryDays(): void
+    {
+        QuoteDay::generateForQuote($this);
+
+        if ($this->start_date && $this->end_date) {
+            $this->days = $this->start_date->diffInDays($this->end_date) + 1;
+            $this->save();
+        }
+    }
+
+    // ============================================================
+    // MÉTODOS DE HOTELES
+    // ============================================================
+
+    /**
+     * Obtiene las opciones de hotel agrupadas por día
+     */
+    public function getAccommodationByDay(int $optionNumber = 1): array
+    {
+        return $this->accommodations()
+            ->where('option_number', $optionNumber)
+            ->with('quoteDay')
+            ->get()
+            ->groupBy('id_quote_day')
+            ->map(function ($items) {
+                return $items->first();
+            })
+            ->toArray();
+    }
+
+    /**
+     * Obtiene la cobertura de hoteles por día para una opción
+     */
+    public function getAccommodationCoverage(int $optionNumber = 1): array
+    {
+        $days = $this->quoteDays()->pluck('id_quote_day')->toArray();
+        $accommodatedDays = $this->accommodations()
+            ->where('option_number', $optionNumber)
+            ->pluck('id_quote_day')
+            ->toArray();
+
+        return [
+            'total_days' => count($days),
+            'covered_days' => count(array_intersect($days, $accommodatedDays)),
+            'missing_days' => array_diff($days, $accommodatedDays),
+        ];
+    }
+
+    /**
+     * Verifica si todos los días tienen hotel para una opción
+     */
+    public function hasCompleteAccommodation(int $optionNumber = 1): bool
+    {
+        $coverage = $this->getAccommodationCoverage($optionNumber);
+        return $coverage['covered_days'] === $coverage['total_days'];
+    }
+
+    /**
+     * Agrega un hotel para un día específico
+     */
+    public function addAccommodationForDay(
+        int $optionNumber,
+        int $quoteDayId,
+        int $serviceId,
+        int $tariffId,
+        int $supplierId,
+        float $unitPrice
+    ): QuoteAccommodation {
+        return $this->accommodations()->create([
+            'option_number' => $optionNumber,
+            'id_quote_day' => $quoteDayId,
+            'id_service' => $serviceId,
+            'id_tariff' => $tariffId,
+            'id_supplier' => $supplierId,
+            'unit_price' => $unitPrice,
+            'subtotal' => $unitPrice,
+        ]);
+    }
+
+    /**
+     * Agrega el mismo hotel para múltiples días
+     */
+    public function addAccommodationForDays(
+        int $optionNumber,
+        array $quoteDayIds,
+        int $serviceId,
+        int $tariffId,
+        int $supplierId,
+        float $unitPrice
+    ): array {
+        $records = [];
+        foreach ($quoteDayIds as $dayId) {
+            $records[] = $this->addAccommodationForDay(
+                $optionNumber,
+                $dayId,
+                $serviceId,
+                $tariffId,
+                $supplierId,
+                $unitPrice
+            );
+        }
+        return $records;
+    }
+
+    /**
+     * Clona los hoteles de la opción 1 a la opción 2
+     */
+    public function cloneAccommodationOption1ToOption2(): void
+    {
+        $option1Hotels = $this->accommodationOption1()->get();
+
+        // Eliminar opción 2 existente
+        $this->accommodationOption2()->delete();
+
+        foreach ($option1Hotels as $hotel) {
+            $this->accommodations()->create([
+                'option_number' => 2,
+                'id_quote_day' => $hotel->id_quote_day,
+                'id_service' => $hotel->id_service,
+                'id_tariff' => $hotel->id_tariff,
+                'id_supplier' => $hotel->id_supplier,
+                'unit_price' => $hotel->unit_price,
+                'subtotal' => $hotel->unit_price,
+            ]);
+        }
+    }
+
+    // ============================================================
+    // MÉTODOS DE CÁLCULO
+    // ============================================================
+
+    public function calculateTotals(int $accommodationOption = 1): void
+    {
+        $itineraryTotal = $this->details()->sum('subtotal');
+        $accommodationTotal = $this->accommodations()
+            ->where('option_number', $accommodationOption)
+            ->sum('subtotal');
+
+        $this->subtotal = $itineraryTotal + $accommodationTotal;
+        $this->total = $this->subtotal;
+        $this->save();
+    }
+
+    public function getTotalsByOption(): array
+    {
+        $itineraryTotal = $this->details()->sum('subtotal');
+
+        return [
+            1 => $itineraryTotal + $this->accommodations()->where('option_number', 1)->sum('subtotal'),
+            2 => $itineraryTotal + $this->accommodations()->where('option_number', 2)->sum('subtotal'),
+        ];
+    }
+
+    public function getTariffForService(Service $service, int $passengersCount): ?Tariff
+    {
+        $mode = $service->pricing_type;
+
+        if ($mode === 'flat') {
+            return Tariff::where('id_service', $service->id_service)
+                ->whereNull('id_season')
+                ->where('status', 'active')
+                ->first();
+        }
+
+        return Tariff::where('id_service', $service->id_service)
+            ->whereNull('id_season')
+            ->where('status', 'active')
+            ->where('min_people_count', '<=', $passengersCount)
+            ->where(function ($query) use ($passengersCount) {
+                $query->where('max_people_count', '>=', $passengersCount)
+                    ->orWhereNull('max_people_count');
+            })
+            ->orderBy('min_people_count')
+            ->first();
+    }
+
+    // ============================================================
+    // MÉTODOS PARA EL CORRELATIVO
+    // ============================================================
+
+    public static function generateCorrelative(string $startDate): string
+    {
+        $date = new \DateTime($startDate);
+        $year = $date->format('Y');
+        $month = $date->format('m');
+
+        $lastCorrelative = self::where('correlative', 'LIKE', "{$month}-%-{$year}")
+            ->whereNotNull('correlative')
+            ->orderBy('correlative', 'asc')
+            ->first();
+
+        if ($lastCorrelative && $lastCorrelative->correlative) {
+            $parts = explode('-', $lastCorrelative->correlative);
+            $lastNumber = intval($parts[1] ?? 101);
+            $nextNumber = $lastNumber - 1;
+        } else {
+            $nextNumber = 101;
+        }
+
+        if ($nextNumber < 0) {
+            Log::warning('Se alcanzó el límite inferior de correlativos para el mes', [
+                'month' => $month,
+                'year' => $year,
+                'last_correlative' => $lastCorrelative->correlative ?? 'null'
+            ]);
+            $nextNumber = 101;
+        }
+
+        return "{$month}-" . str_pad($nextNumber, 3, '0', STR_PAD_LEFT) . "-{$year}";
+    }
+
+    public function assignCorrelative(): bool
+    {
+        if ($this->status !== 'approved' || $this->correlative) {
+            return false;
+        }
+
+        if (!$this->start_date) {
+            Log::warning('Intento de asignar correlativo sin start_date', [
+                'quote_id' => $this->id_quote,
+                'quote_number' => $this->quote_number
+            ]);
+            return false;
+        }
+
+        $this->correlative = self::generateCorrelative($this->start_date->format('Y-m-d'));
+        $this->correlative_assigned_at = now();
+        $this->save();
+
+        return true;
+    }
+
+    public function hasCorrelative(): bool
+    {
+        return !empty($this->correlative);
+    }
+
+    public function getFormattedCorrelativeAttribute(): string
+    {
+        return $this->correlative ?? 'Sin asignar';
+    }
+
+    public function isValidCorrelative(): bool
+    {
+        if (!$this->correlative) {
+            return false;
+        }
+
+        $pattern = '/^\d{2}-\d{3}-\d{4}$/';
+        if (!preg_match($pattern, $this->correlative)) {
+            return false;
+        }
+
+        $parts = explode('-', $this->correlative);
+        $number = intval($parts[1]);
+
+        return $number >= 0 && $number <= 101;
+    }
+
+    // ============================================================
+    // ACCESSORS
+    // ============================================================
+
+    public function getStatusLabelAttribute(): string
+    {
+        return [
+            'draft' => 'Borrador',
+            'sent' => 'Enviada',
+            'approved' => 'Aprobada',
+            'rejected' => 'Rechazada',
+            'expired' => 'Vencida',
+            'cancelled' => 'Cancelada',
+        ][$this->status] ?? $this->status;
+    }
+
+    public function getStatusColorAttribute(): string
+    {
+        return [
+            'draft' => 'gray',
+            'sent' => 'blue',
+            'approved' => 'green',
+            'rejected' => 'red',
+            'expired' => 'orange',
+            'cancelled' => 'gray',
+        ][$this->status] ?? 'gray';
+    }
+
+    public function getCurrencySymbolAttribute(): string
+    {
+        return [
+            'PEN' => 'S/',
+            'USD' => '$',
+            'EUR' => '€',
+        ][$this->currency] ?? 'S/';
+    }
+}
