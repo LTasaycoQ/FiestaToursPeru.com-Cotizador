@@ -105,7 +105,8 @@ class QuoteDay extends Model
 
     public function canAddService(): bool
     {
-        return $this->services_count < 2;
+        // Quitar restricción: permitir agregar cualquier cantidad de servicios por día
+        return true;
     }
 
     /**

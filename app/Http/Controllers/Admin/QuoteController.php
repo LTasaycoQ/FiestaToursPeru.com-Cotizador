@@ -87,12 +87,9 @@ class QuoteController extends Controller
             })
             ->get();
 
-        $accommodationServices = Service::with(['labels', 'supplier', 'tariffs'])
-            ->where('status', 'active')
-            ->whereHas('category', function ($q) {
-                $q->where('is_accommodation', true);
-            })
-            ->get();
+        $accommodationServices = $this->accommodationServicesQuery(
+            Service::with(['labels', 'supplier', 'tariffs'])
+        )->get();
 
         $labels = Labels::where('status', 'active')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
@@ -153,7 +150,7 @@ class QuoteController extends Controller
             $nextNumber = $lastQuote ? intval(substr($lastQuote->quote_number, -4)) + 1 : 1;
             $quoteNumber = 'COT-'.str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
-            \Log::info('📄 Creando cotización: '.$quoteNumber);
+            \Log::info('Creando cotización: '.$quoteNumber);
 
             $quote = Quote::create([
                 'name' => $request->name ?? 'Cotización '.$quoteNumber,
@@ -173,7 +170,7 @@ class QuoteController extends Controller
                 'total' => 0,
             ]);
 
-            \Log::info('✅ Cotización creada ID: '.$quote->id_quote);
+            \Log::info('Cotización creada ID: '.$quote->id_quote);
 
             if (! method_exists($quote, 'generateItineraryDays')) {
                 throw new \Exception('El método generateItineraryDays() no existe en el modelo Quote');
@@ -267,12 +264,9 @@ class QuoteController extends Controller
             ->where('status', 'active')
             ->get();
 
-        $accommodationServices = Service::with(['labels', 'supplier', 'tariffs'])
-            ->where('status', 'active')
-            ->whereHas('category', function ($q) {
-                $q->where('is_accommodation', true);
-            })
-            ->get();
+        $accommodationServices = $this->accommodationServicesQuery(
+            Service::with(['labels', 'supplier', 'tariffs', 'category'])
+        )->get();
 
         $labels = Labels::where('status', 'active')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
@@ -412,6 +406,45 @@ class QuoteController extends Controller
             'success' => true,
             'data' => $contacts,
         ]);
+    }
+
+    private function accommodationServicesQuery($query)
+    {
+        $terms = ['hotel', 'hospedaje', 'hospedaje', 'room', 'habitacion', 'habitación', 'alojamiento', 'lodging', 'resort', 'hostel', 'suite'];
+
+        return $query->where('status', 'active')->where(function ($query) use ($terms) {
+            $query->whereHas('category', function ($subQuery) use ($terms) {
+                $subQuery->where('is_accommodation', true)
+                    ->orWhere(function ($nameQuery) use ($terms) {
+                        foreach ($terms as $term) {
+                            $nameQuery->orWhereRaw('LOWER(name) LIKE ?', ['%'.$term.'%']);
+                        }
+                    });
+            })->orWhere(function ($fallback) use ($terms) {
+                foreach ($terms as $term) {
+                    $fallback->orWhereRaw('LOWER(name_service) LIKE ?', ['%'.$term.'%']);
+                }
+            });
+        });
+    }
+
+    private function isAccommodationService(Service $service): bool
+    {
+        if ($service->is_accommodation) {
+            return true;
+        }
+
+        $keywords = ['hotel', 'hospedaje', 'room', 'habitacion', 'habitación', 'alojamiento', 'lodging', 'resort', 'hostel', 'suite'];
+        $serviceName = strtolower((string) $service->name_service);
+        $categoryName = strtolower((string) ($service->category?->name ?? ''));
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($serviceName, $keyword) || str_contains($categoryName, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function getTariffForService(Service $service, int $passengersCount, ?Quote $quote = null): ?Tariff
@@ -605,7 +638,7 @@ class QuoteController extends Controller
             return response()->json([
                 'success' => true,
                 'pricing_type' => $service->pricing_type,
-                'is_accommodation' => $service->is_accommodation,
+                'is_accommodation' => $this->isAccommodationService($service),
                 'data' => $tariffs,
                 'seasons' => $seasons,
             ]);
@@ -809,12 +842,34 @@ class QuoteController extends Controller
             'status' => 'required|in:draft,sent,approved,rejected,expired,cancelled',
         ])['status'];
 
+        $oldStatus = $quote->status;
         $quote->status = $status;
         $quote->save();
+
+        $correlative = null;
+        if ($status === 'approved' && $oldStatus !== 'approved') {
+            if (! $quote->start_date) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La cotización debe tener una fecha de inicio para asignar el correlativo.',
+                ], 422);
+            }
+
+            $assigned = $quote->assignCorrelative();
+            $correlative = $quote->fresh()->correlative;
+
+            if (! $assigned || ! $correlative) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo generar el correlativo para la cotización aprobada.',
+                ], 422);
+            }
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Estado actualizado correctamente.',
+            'correlative' => $correlative,
         ]);
     }
 
@@ -822,18 +877,28 @@ class QuoteController extends Controller
     {
         $data = $request->validate([
             'option_number' => 'required|integer|in:1,2',
-            'day_number' => 'required|integer|min:1',
+            'day_number' => 'nullable|integer|min:1',
+            'day_start' => 'nullable|integer|min:1',
+            'day_end' => 'nullable|integer|min:1|gte:day_start',
             'id_service' => 'required|exists:service,id_service',
             'id_tariff' => 'nullable|exists:tariff,id_tariff',
         ]);
 
-        $day = $quote->quoteDays()->where('day_number', $data['day_number'])->first();
-        $service = Service::with('category')->where('status', 'active')->find($data['id_service']);
+        $startDay = (int) ($request->input('day_start', $request->input('day_number', 1)));
+        $endDay = (int) ($request->input('day_end', $request->input('day_number', $startDay)));
 
-        if (! $day || ! $service || ! $service->is_accommodation) {
+        if ($endDay < $startDay) {
             return response()->json([
                 'success' => false,
-                'message' => 'El día o hotel seleccionado no está disponible.',
+                'message' => 'El día final no puede ser menor que el día inicial.',
+            ], 422);
+        }
+
+        $service = Service::with('category')->where('status', 'active')->find($data['id_service']);
+        if (! $service || ! $this->isAccommodationService($service)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El hotel seleccionado no está disponible.',
             ], 422);
         }
 
@@ -850,26 +915,45 @@ class QuoteController extends Controller
             ], 422);
         }
 
-        QuoteAccommodation::updateOrCreate(
-            [
-                'id_quote' => $quote->id_quote,
-                'option_number' => $data['option_number'],
-                'id_quote_day' => $day->id_quote_day,
-            ],
-            [
-                'id_service' => $service->id_service,
-                'id_tariff' => $tariff->id_tariff,
-                'id_supplier' => $service->id_supplier,
-                'unit_price' => $tariff->price,
-                'subtotal' => $tariff->price,
-            ]
-        );
+        $daysAssigned = [];
+        for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+            $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+
+            if (! $day) {
+                continue;
+            }
+
+            $accommodation = QuoteAccommodation::updateOrCreate(
+                [
+                    'id_quote' => $quote->id_quote,
+                    'option_number' => $data['option_number'],
+                    'id_quote_day' => $day->id_quote_day,
+                ],
+                [
+                    'id_service' => $service->id_service,
+                    'id_tariff' => $tariff->id_tariff,
+                    'id_supplier' => $service->id_supplier,
+                    'unit_price' => $tariff->price,
+                    'subtotal' => $tariff->price,
+                ]
+            );
+
+            $daysAssigned[] = $accommodation->id_quote_accommodation;
+        }
+
+        if (empty($daysAssigned)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró un día válido del itinerario para asignar el hotel.',
+            ], 422);
+        }
 
         $quote->calculateTotals(1);
 
         return response()->json([
             'success' => true,
             'message' => 'Hotel guardado correctamente.',
+            'days_assigned' => count($daysAssigned),
         ]);
     }
 

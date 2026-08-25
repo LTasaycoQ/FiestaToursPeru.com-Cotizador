@@ -11,8 +11,8 @@
 .qc-body { padding:28px; }
 .form-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px 20px; }
 .form-group label { display:block; font-size:12px; font-weight:600; color:#475569; margin-bottom:6px; }
-.form-control { width:100%; padding:10px 14px; border-radius:8px; border:1.5px solid var(--qc-line); font-size:13.5px; outline:none; }
-.form-control:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+.form-control { width:100%; padding:10px 14px; border-radius: 4px; border:1.5px solid var(--qc-line); font-size:13.5px;  }
+.form-control:focus { border-color: #6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
 .form-control:disabled { background:#f1f5f9; color:#94a3b8; cursor:not-allowed; }
 .form-actions { display:flex; gap:10px; margin-top:24px; }
 .btn { padding:10px 20px; border-radius:8px; font-weight:600; font-size:13px; border:1px solid transparent; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
@@ -75,9 +75,14 @@
 
                     <div class="form-group">
                         <label>Contacto</label>
-                        <select class="form-control" name="id_contacts" id="id_contacts">
-                            <option value="">Primero seleccione un cliente</option>
-                        </select>
+                        <div style="display:flex; gap:8px; align-items:flex-end;">
+                            <select class="form-control" name="id_contacts" id="id_contacts" style="flex:1;">
+                                <option value="">Primero seleccione un cliente</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary" style="padding:10px 12px; white-space:nowrap; background: #0F172A;color:white; border-color: #0F172A;" onclick="openQuoteContactModal()">
+                                <i class="ti ti-plus"></i> 
+                            </button>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -154,8 +159,107 @@
     </div>
 </div>
 
+<div id="modalQuoteNewContact" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div style="width:min(520px,100%); background:#fff; border-radius:14px; padding:22px 20px; box-shadow:0 24px 64px rgba(15,23,42,.18);">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h5 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Nuevo contacto</h5>
+            <button type="button" class="btn btn-secondary" onclick="closeQuoteContactModal()" style="padding:8px 12px;">✕</button>
+        </div>
+        <form id="quoteNewContactForm">
+            @csrf
+            <input type="hidden" name="id_client" id="quote_new_contact_id_client">
+            <div class="form-grid" style="grid-template-columns:repeat(2,1fr); gap:16px 20px;">
+                <div class="form-group" style="grid-column:span 2;">
+                    <label>Nombre <span style="color:#dc2626">*</span></label>
+                    <input type="text" class="form-control" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>Apellidos</label>
+                    <input type="text" class="form-control" name="last_names">
+                </div>
+                <div class="form-group">
+                    <label>Cargo</label>
+                    <input type="text" class="form-control" name="qualification">
+                </div>
+                <div class="form-group">
+                    <label>Correo</label>
+                    <input type="email" class="form-control" name="email">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" class="form-control" name="first_phone">
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy"></i> Guardar contacto</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @push('scripts')
 <script>
+const CONTACT_STORE_URL = '{{ route("admin.contacts.store") }}';
+const CSRF_TOKEN = '{{ csrf_token() }}';
+
+function openQuoteContactModal() {
+    const clientId = document.getElementById('id_client').value;
+    if (!clientId) {
+        Swal ? Swal.fire({ icon: 'warning', title: 'Selecciona un cliente primero' }) : alert('Selecciona un cliente primero');
+        return;
+    }
+    document.getElementById('quote_new_contact_id_client').value = clientId;
+    document.getElementById('modalQuoteNewContact').style.display = 'flex';
+}
+
+function closeQuoteContactModal() {
+    document.getElementById('modalQuoteNewContact').style.display = 'none';
+    document.getElementById('quoteNewContactForm').reset();
+}
+
+function saveQuoteContactModal(event) {
+    event.preventDefault();
+    const form = document.getElementById('quoteNewContactForm');
+    const formData = new FormData(form);
+    formData.set('_token', CSRF_TOKEN);
+
+    fetch(CONTACT_STORE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'No se pudo crear el contacto.');
+        }
+        return data;
+    })
+    .then((data) => {
+        closeQuoteContactModal();
+        cargarContactos();
+        setTimeout(() => {
+            const contactsSelect = document.getElementById('id_contacts');
+            for (let i = 0; i < contactsSelect.options.length; i++) {
+                if (String(contactsSelect.options[i].value) === String(data.contact.id)) {
+                    contactsSelect.value = data.contact.id;
+                    break;
+                }
+            }
+        }, 300);
+        if (window.Swal) {
+            Swal.fire({ icon: 'success', title: 'Contacto guardado', timer: 1200, showConfirmButton: false });
+        }
+    })
+    .catch((error) => {
+        if (window.Swal) {
+            Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo crear el contacto.' });
+        } else {
+            alert(error.message || 'No se pudo crear el contacto.');
+        }
+    });
+}
+
 function setDateMode(mode) {
     document.getElementById('date_mode').value = mode;
 
@@ -216,6 +320,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Restaurar el modo previo (si hubo error de validación) o dejar 'dates' por defecto
     var initialMode = document.getElementById('date_mode').value || 'dates';
     setDateMode(initialMode);
+
+    document.getElementById('quoteNewContactForm').addEventListener('submit', saveQuoteContactModal);
 
     // Preseleccionar contacto si hay un valor old
     var oldContact = '{{ old('id_contacts') }}';

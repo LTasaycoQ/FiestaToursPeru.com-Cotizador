@@ -54,6 +54,15 @@
 .field-section__label { display: flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 700; color: var(--qe-ink-500); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
 .field-section__label i { color: var(--qe-accent); font-size: 15px; }
 
+.qe-collapsible { border: 1px solid var(--qe-line); border-radius: var(--qe-radius-lg); background: var(--qe-surface-muted); overflow: hidden; margin-bottom: 18px; }
+.qe-collapsible summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; font-size: 11.5px; font-weight: 700; color: var(--qe-ink-500); text-transform: uppercase; letter-spacing: 0.06em; }
+.qe-collapsible summary::-webkit-details-marker { display: none; }
+.qe-collapsible summary .qe-collapse-title { display: flex; align-items: center; gap: 8px; }
+.qe-collapsible summary .qe-collapse-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: rgba(99, 102, 241, 0.08); color: var(--qe-accent); font-size: 16px; }
+.qe-collapsible summary .qe-collapse-arrow { transition: transform .2s ease; color: var(--qe-ink-500); }
+.qe-collapsible[open] summary .qe-collapse-arrow { transform: rotate(180deg); }
+.qe-collapsible-content { padding: 0 18px 18px; }
+
 .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 20px; }
 .form-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .form-group { margin-bottom: 0; }
@@ -272,7 +281,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                 <div class="qe-header">
                     <div class="qe-header-left">
                         <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">
-                            <i class="ti ti-arrow-left"></i> Volver
+                            <i class="ti ti-chevron-left"></i>
                         </a>
                         <div style="display:flex; align-items:center; gap:12px;">
                             <div class="qe-header-icon"><i class="ti ti-file-edit"></i></div>
@@ -372,12 +381,17 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 </div>
                                 <div class="form-group">
                                     <label for="id_contacts">Contacto</label>
-                                    <select class="form-control" id="id_contacts" name="id_contacts">
-                                        <option value="">Seleccione un contacto</option>
-                                        @foreach($contacts as $contact)
-                                            <option value="{{ $contact->id_contacts }}" {{ old('id_contacts', $quote->id_contacts) == $contact->id_contacts ? 'selected' : '' }}>{{ $contact->name }} {{ $contact->last_names }}</option>
-                                        @endforeach
-                                    </select>
+                                    <div style="display:flex; gap:8px; align-items:flex-end;">
+                                        <select class="form-control" id="id_contacts" name="id_contacts" style="flex:1;">
+                                            <option value="">Seleccione un contacto</option>
+                                            @foreach($contacts as $contact)
+                                                <option value="{{ $contact->id_contacts }}" {{ old('id_contacts', $quote->id_contacts) == $contact->id_contacts ? 'selected' : '' }}>{{ $contact->name }} {{ $contact->last_names }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button type="button" class="btn btn-secondary" style="background-color: #0F172A;  color:white; padding:10px 12px; white-space:nowrap;" onclick="openQuoteContactModal()">
+                                            <i class="ti ti-plus"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -394,14 +408,11 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     <input type="date" class="form-control" id="end_date" name="end_date" value="{{ old('end_date', $quote->end_date ? $quote->end_date->format('Y-m-d') : '') }}">
                                 </div>
                             </div>
-                            <div class="field-hint" style="margin-top:10px;">
-                                <i class="ti ti-alert-triangle" style="color:#f59e0b;"></i>
-                                Si cambias estas fechas, el itinerario se regenera y perderás los servicios y hoteles ya agregados.
-                            </div>
+                            
                         </div>
 
                         <div class="field-section">
-                            <div class="field-section__label"><i class="ti ti-notes"></i> Observaciones</div>
+                            <div class="field-section__label"><i class="ti ti-notes"></i> Notas</div>
                             <div class="form-group">
                                 <textarea class="form-control" id="notes" name="notes" rows="3">{{ old('notes', $quote->notes) }}</textarea>
                             </div>
@@ -412,6 +423,44 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">Cancelar</a>
                         </div>
                     </form>
+
+                    <div id="modalQuoteNewContact" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+                        <div style="width:min(520px,100%); background:#fff; border-radius:14px; padding:22px 20px; box-shadow:0 24px 64px rgba(15,23,42,.18);">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                                <h5 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Nuevo contacto</h5>
+                                <button type="button" class="btn btn-secondary" onclick="closeQuoteContactModal()" style="padding:8px 12px;">✕</button>
+                            </div>
+                            <form id="quoteNewContactForm">
+                                @csrf
+                                <input type="hidden" name="id_client" id="quote_new_contact_id_client">
+                                <div class="form-grid" style="grid-template-columns:repeat(2,1fr); gap:16px 20px;">
+                                    <div class="form-group" style="grid-column:span 2;">
+                                        <label>Nombre <span style="color:#dc2626">*</span></label>
+                                        <input type="text" class="form-control" name="name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Apellidos</label>
+                                        <input type="text" class="form-control" name="last_names">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Cargo</label>
+                                        <input type="text" class="form-control" name="qualification">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Correo</label>
+                                        <input type="email" class="form-control" name="email">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Teléfono</label>
+                                        <input type="text" class="form-control" name="first_phone">
+                                    </div>
+                                </div>
+                                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+                                    <button style="width:100%; border-radius:8px;" type="submit" class="btn btn-primary"><i class="ti ti-device-floppy"></i> Guardar contacto</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
 
                     <div class="itinerary-section">
                         <div class="itinerary-header">
@@ -496,18 +545,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                         @endforelse
                                     </div>
 
-                                    @if($day->details->count() < 2)
                                         <button type="button" class="btn btn-primary btn-sm" onclick="openAddServiceModal({{ $day->day_number }})">
                                             <i class="ti ti-plus"></i> Agregar servicio al Día {{ $day->day_number }}
                                         </button>
-                                        <div class="day-limit-note">
-                                            <i class="ti ti-info-circle"></i> Máximo 2 servicios por día ({{ $day->details->count() }}/2 usados)
-                                        </div>
-                                    @else
-                                        <div class="day-limit-note">
-                                            <i class="ti ti-lock"></i> Este día alcanzó el máximo de 2 servicios
-                                        </div>
-                                    @endif
                                 </div>
                             @endforeach
                         @else
@@ -537,27 +577,99 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 <div class="option-label"><i class="ti ti-number-1"></i> Opción 1</div>
                                 @php $hotelsOption1 = $quote->accommodationOption1->sortBy('quoteDay.day_number'); @endphp
                                 @if($hotelsOption1->count() > 0)
-                                    <div class="accommodation-days-grid">
-                                        @foreach($hotelsOption1 as $hotel)
-                                            <div class="accommodation-day-item" id="acc-{{ $hotel->id_quote_accommodation }}">
-                                                <div class="day-info">
-                                                    <span class="day-number">Día {{ $hotel->quoteDay->day_number }}</span>
+                                    @php
+                                        $groups = [];
+                                        foreach($hotelsOption1 as $hotel) {
+                                            $sid = $hotel->id_service ?? 's'.$hotel->id_quote_accommodation;
+                                            if (! isset($groups[$sid])) {
+                                                $groups[$sid] = [
+                                                    'service' => $hotel->service,
+                                                    'prices' => [],
+                                                    'days' => [],
+                                                    'dates' => [],
+                                                    'accom_ids' => [],
+                                                ];
+                                            }
+                                            $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
+                                            $groups[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date->format('d/m/Y');
+                                            $groups[$sid]['prices'][] = $hotel->unit_price;
+                                            $groups[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
+                                        }
+                                    @endphp
+
+                                    <div class="accommodation-groups">
+                                        @foreach($groups as $sid => $group)
+                                            @php
+                                                $days = $group['days'];
+                                                sort($days);
+                                                $ranges = [];
+                                                $start = null; $prev = null;
+                                                foreach($days as $d) {
+                                                    if ($start === null) { $start = $prev = $d; }
+                                                    elseif ($d == $prev + 1) { $prev = $d; }
+                                                    else { $ranges[] = [$start,$prev]; $start = $prev = $d; }
+                                                }
+                                                if ($start !== null) $ranges[] = [$start,$prev];
+                                                $min = min($days);
+                                                $max = max($days);
+                                                $uniquePrices = array_values(array_unique($group['prices']));
+                                                $priceDisplay = count($uniquePrices) === 1 ? number_format($uniquePrices[0], 2) : null;
+                                            @endphp
+
+                                            <div class="accommodation-group" style="border:1px solid var(--qe-line); border-radius:8px; padding:10px; margin-bottom:10px;">
+                                                <div class="group-summary" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                                    <div style="flex:1; min-width:0;">
+                                                        <div style="font-weight:700;">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</div>
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
+                                                            @foreach($ranges as $r)
+                                                                @if($r[0] == $r[1])
+                                                                    <span>Día {{ $r[0] }} ({{ $group['dates'][$r[0]] }})</span>
+                                                                @else
+                                                                    <span>Día {{ $r[0] }}–{{ $r[1] }} ({{ $group['dates'][$r[0]] }} – {{ $group['dates'][$r[1]] }})</span>
+                                                                @endif
+                                                                @if(! $loop->last) <span style="margin:0 8px;">•</span> @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                    <div style="display:flex; gap:8px; align-items:center;">
+                                                        <div style="min-width:80px; text-align:right; font-weight:600;">@if($priceDisplay) $ {{ $priceDisplay }} @else Varios precios @endif</div>
+                                                        <div style="display:flex; gap:6px;">
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg1_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
+                                                            <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(1, null, {{ $min }}, {{ $max }})"><i class="ti ti-edit"></i> Editar rango</button>
+                                                            <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> Eliminar</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div class="day-hotel">
-                                                    <span class="hotel-name">{{ $hotel->service->name_service ?? 'Hotel eliminado' }}</span>
-                                                    <span class="hotel-price">$ {{ number_format($hotel->unit_price, 2) }}</span>
-                                                </div>
-                                                <div class="day-actions">
-                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(1, {{ $hotel->quoteDay->day_number }})" title="Cambiar">
-                                                        <i class="ti ti-edit"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodation({{ $hotel->id_quote_accommodation }})" title="Eliminar">
-                                                        <i class="ti ti-trash"></i>
-                                                    </button>
+
+                                                <div class="group-days" id="accg1_{{ $sid }}" style="display:none; margin-top:10px;">
+                                                    <div class="accommodation-days-grid">
+                                                        @foreach($days as $d)
+                                                            <div class="accommodation-day-item" id="acc-{{ $group['accom_ids'][$d] }}">
+                                                                <div class="day-info">
+                                                                    <span class="day-number">Día {{ $d }}</span>
+                                                                    <span class="day-date">{{ $group['dates'][$d] }}</span>
+                                                                </div>
+                                                                <div class="day-hotel">
+                                                                    <span class="hotel-name">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</span>
+                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
+                                                                </div>
+                                                                <div class="day-actions">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(1, {{ $d }})" title="Cambiar">
+                                                                        <i class="ti ti-edit"></i>
+                                                                    </button>
+                                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodation({{ $group['accom_ids'][$d] }})" title="Eliminar">
+                                                                        <i class="ti ti-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
                                                 </div>
                                             </div>
+
                                         @endforeach
                                     </div>
+
                                     <div style="margin-top:10px;">
                                         <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(1, null)">
                                             <i class="ti ti-plus"></i> Agregar/Reemplazar hotel
@@ -579,28 +691,99 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 <div class="option-label"><i class="ti ti-number-2"></i> Opción 2</div>
                                 @php $hotelsOption2 = $quote->accommodationOption2->sortBy('quoteDay.day_number'); @endphp
                                 @if($hotelsOption2->count() > 0)
-                                    <div class="accommodation-days-grid">
-                                        @foreach($hotelsOption2 as $hotel)
-                                            <div class="accommodation-day-item" id="acc-{{ $hotel->id_quote_accommodation }}">
-                                                <div class="day-info">
-                                                    <span class="day-number">Día {{ $hotel->quoteDay->day_number }}</span>
-                                                    <span class="day-date">{{ $hotel->quoteDay->date->format('d/m/Y') }}</span>
+                                    @php
+                                        $groups2 = [];
+                                        foreach($hotelsOption2 as $hotel) {
+                                            $sid = $hotel->id_service ?? 's'.$hotel->id_quote_accommodation;
+                                            if (! isset($groups2[$sid])) {
+                                                $groups2[$sid] = [
+                                                    'service' => $hotel->service,
+                                                    'prices' => [],
+                                                    'days' => [],
+                                                    'dates' => [],
+                                                    'accom_ids' => [],
+                                                ];
+                                            }
+                                            $groups2[$sid]['days'][] = $hotel->quoteDay->day_number;
+                                            $groups2[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date->format('d/m/Y');
+                                            $groups2[$sid]['prices'][] = $hotel->unit_price;
+                                            $groups2[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
+                                        }
+                                    @endphp
+
+                                    <div class="accommodation-groups">
+                                        @foreach($groups2 as $sid => $group)
+                                            @php
+                                                $days = $group['days'];
+                                                sort($days);
+                                                $ranges = [];
+                                                $start = null; $prev = null;
+                                                foreach($days as $d) {
+                                                    if ($start === null) { $start = $prev = $d; }
+                                                    elseif ($d == $prev + 1) { $prev = $d; }
+                                                    else { $ranges[] = [$start,$prev]; $start = $prev = $d; }
+                                                }
+                                                if ($start !== null) $ranges[] = [$start,$prev];
+                                                $min = min($days);
+                                                $max = max($days);
+                                                $uniquePrices = array_values(array_unique($group['prices']));
+                                                $priceDisplay = count($uniquePrices) === 1 ? number_format($uniquePrices[0], 2) : null;
+                                            @endphp
+
+                                            <div class="accommodation-group" style="border:1px solid var(--qe-line); border-radius:8px; padding:10px; margin-bottom:10px;">
+                                                <div class="group-summary" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                                    <div style="flex:1; min-width:0;">
+                                                        <div style="font-weight:700;">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</div>
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
+                                                            @foreach($ranges as $r)
+                                                                @if($r[0] == $r[1])
+                                                                    <span>Día {{ $r[0] }} ({{ $group['dates'][$r[0]] }})</span>
+                                                                @else
+                                                                    <span>Día {{ $r[0] }}–{{ $r[1] }} ({{ $group['dates'][$r[0]] }} – {{ $group['dates'][$r[1]] }})</span>
+                                                                @endif
+                                                                @if(! $loop->last) <span style="margin:0 8px;">•</span> @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                    <div style="display:flex; gap:8px; align-items:center;">
+                                                        <div style="min-width:80px; text-align:right; font-weight:600;">@if($priceDisplay) $ {{ $priceDisplay }} @else Varios precios @endif</div>
+                                                        <div style="display:flex; gap:6px;">
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg2_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
+                                                            <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(2, null, {{ $min }}, {{ $max }})"><i class="ti ti-edit"></i> Editar rango</button>
+                                                            <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> Eliminar</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div class="day-hotel">
-                                                    <span class="hotel-name">{{ $hotel->service->name_service ?? 'Hotel eliminado' }}</span>
-                                                    <span class="hotel-price">$ {{ number_format($hotel->unit_price, 2) }}</span>
-                                                </div>
-                                                <div class="day-actions">
-                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(2, {{ $hotel->quoteDay->day_number }})" title="Cambiar">
-                                                        <i class="ti ti-edit"></i>
-                                                    </button>
-                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodation({{ $hotel->id_quote_accommodation }})" title="Eliminar">
-                                                        <i class="ti ti-trash"></i>
-                                                    </button>
+
+                                                <div class="group-days" id="accg2_{{ $sid }}" style="display:none; margin-top:10px;">
+                                                    <div class="accommodation-days-grid">
+                                                        @foreach($days as $d)
+                                                            <div class="accommodation-day-item" id="acc-{{ $group['accom_ids'][$d] }}">
+                                                                <div class="day-info">
+                                                                    <span class="day-number">Día {{ $d }}</span>
+                                                                    <span class="day-date">{{ $group['dates'][$d] }}</span>
+                                                                </div>
+                                                                <div class="day-hotel">
+                                                                    <span class="hotel-name">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</span>
+                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
+                                                                </div>
+                                                                <div class="day-actions">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(2, {{ $d }})" title="Cambiar">
+                                                                        <i class="ti ti-edit"></i>
+                                                                    </button>
+                                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodation({{ $group['accom_ids'][$d] }})" title="Eliminar">
+                                                                        <i class="ti ti-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
                                                 </div>
                                             </div>
+
                                         @endforeach
                                     </div>
+
                                     <div style="margin-top:10px;">
                                         <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(2, null)">
                                             <i class="ti ti-plus"></i> Agregar/Reemplazar hotel
@@ -671,6 +854,29 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                 </div>
 
                 <!-- Tabla de Servicios -->
+
+                <div style="margin-bottom:8px; display:flex; align-items:center; gap:12px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500;">
+                        <input type="checkbox" id="service_as_acc_checkbox" onchange="toggleServiceAsAccommodation(this)"> Agregar como alojamiento
+                    </label>
+                    <div id="service_as_acc_days" style="display:none; align-items:center; gap:8px;">
+                        <label style="font-size:13px; color:var(--qe-ink-600);">Desde</label>
+                        <select id="service_acc_day_start" class="form-control">
+                            <option value="">Inicio</option>
+                            @foreach($quote->quoteDays as $day)
+                                <option value="{{ $day->day_number }}">Día {{ $day->day_number }}</option>
+                            @endforeach
+                        </select>
+                        <label style="font-size:13px; color:var(--qe-ink-600);">Hasta</label>
+                        <select id="service_acc_day_end" class="form-control">
+                            <option value="">Fin</option>
+                            @foreach($quote->quoteDays as $day)
+                                <option value="{{ $day->day_number }}">Día {{ $day->day_number }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
                 <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--qe-line); border-radius: var(--qe-radius-md);">
                     <table class="table service-catalog-table" style="font-size: 13px; margin-bottom: 0;">
                         <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 5; border-bottom: 2px solid var(--qe-line);">
@@ -688,48 +894,60 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 $passengersCount = $quote->passengers_count ?: 1;
                             @endphp
                             @foreach($services as $service)
-                            <tr class="service-row" data-supplier="{{ $service->id_supplier }}" data-language="{{ $service->id_labels }}" data-category="{{ $service->id_category }}" style="border-bottom: 1px solid var(--qe-line);">
-                                <td style="padding: 10px 12px; font-weight: 500;">{{ $service->name_service }}</td>
-                                <td style="padding: 10px 12px; color: var(--qe-ink-500);">{{ $service->supplier->supplier_name ?? '-' }}</td>
-                                <td class="service-category" style="padding: 10px 12px;">{{ $service->category->name ?? '-' }}</td>
-                                <td style="padding: 10px 12px;">
-                                    <select class="form-control service-tariff-select" id="service-tariff-{{ $service->id_service }}" onchange="updateServiceRowPrice({{ $service->id_service }})">
-                                        <option value="">Automática según pasajeros</option>
-                                        @foreach($service->tariffs->groupBy('id_subcategories') as $subcategoryTariffs)
-                                            @php
-                                                $matchingTariff = null;
-                                                foreach ($subcategoryTariffs as $candidateTariff) {
-                                                    $minOk = $candidateTariff->pricing_type === 'flat'
-                                                        || $candidateTariff->min_people_count === null
-                                                        || $candidateTariff->min_people_count <= $passengersCount;
-                                                    $maxOk = $candidateTariff->pricing_type === 'flat'
-                                                        || $candidateTariff->max_people_count === null
-                                                        || $candidateTariff->max_people_count >= $passengersCount;
-                                                    if ($minOk && $maxOk) {
-                                                        if (!$matchingTariff || $candidateTariff->price > $matchingTariff->price) {
-                                                            $matchingTariff = $candidateTariff;
-                                                        }
-                                                    }
-                                                }
-                                                $subcategoryTariff = $matchingTariff ?? $subcategoryTariffs->first();
-                                                $displayPrice = $matchingTariff ? $subcategoryTariff->price : 0;
-                                            @endphp
-                                            <option value="{{ $subcategoryTariff->id_tariff }}" data-price="{{ (float) $displayPrice }}">
-                                                {{ $subcategoryTariff->subCategory->name ?? 'Sin subcategoría' }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td class="service-price" id="service-price-{{ $service->id_service }}" style="padding: 10px 12px; text-align: right;">
-                                    Automática
-                                </td>
-                                <td style="padding: 10px 12px; text-align: center;">
-                                    <button type="button" class="btn btn-primary btn-sm" onclick="addServiceFromList({{ $service->id_service }}, '{{ addslashes($service->name_service) }}', this)">
-                                        <i class="ti ti-plus"></i> Agregar
-                                    </button>
-                                </td>
-                            </tr>
-                            @endforeach
+                                                        @php
+                                                            $isAcc = false;
+                                                            if (isset($service->category) && !empty($service->category->is_accommodation) && $service->category->is_accommodation) {
+                                                                $isAcc = true;
+                                                            } else {
+                                                                $hay = strtolower(($service->name_service ?? '') . ' ' . ($service->supplier->supplier_name ?? ''));
+                                                                $keywords = ['hotel','hosped','alojam','room','habitaci','hostel','resort','suite','lodging'];
+                                                                foreach ($keywords as $kw) {
+                                                                    if (strpos($hay, $kw) !== false) { $isAcc = true; break; }
+                                                                }
+                                                            }
+                                                        @endphp
+                                                        <tr class="service-row" data-supplier="{{ $service->id_supplier }}" data-language="{{ $service->id_labels }}" data-category="{{ $service->id_category }}" data-is-accommodation="{{ $isAcc ? '1' : '0' }}" style="border-bottom: 1px solid var(--qe-line);">
+                                                            <td style="padding: 10px 12px; font-weight: 500;">{{ $service->name_service }}</td>
+                                                            <td style="padding: 10px 12px; color: var(--qe-ink-500);">{{ $service->supplier->supplier_name ?? '-' }}</td>
+                                                            <td class="service-category" style="padding: 10px 12px;">{{ $service->category->name ?? '-' }}</td>
+                                                            <td style="padding: 10px 12px;">
+                                                                <select class="form-control service-tariff-select" id="service-tariff-{{ $service->id_service }}" onchange="updateServiceRowPrice({{ $service->id_service }})">
+                                                                    <option value="">Automática según pasajeros</option>
+                                                                    @foreach($service->tariffs->groupBy('id_subcategories') as $subcategoryTariffs)
+                                                                        @php
+                                                                            $matchingTariff = null;
+                                                                            foreach ($subcategoryTariffs as $candidateTariff) {
+                                                                                $minOk = $candidateTariff->pricing_type === 'flat'
+                                                                                    || $candidateTariff->min_people_count === null
+                                                                                    || $candidateTariff->min_people_count <= $passengersCount;
+                                                                                $maxOk = $candidateTariff->pricing_type === 'flat'
+                                                                                    || $candidateTariff->max_people_count === null
+                                                                                    || $candidateTariff->max_people_count >= $passengersCount;
+                                                                                if ($minOk && $maxOk) {
+                                                                                    if (!$matchingTariff || $candidateTariff->price > $matchingTariff->price) {
+                                                                                        $matchingTariff = $candidateTariff;
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            $subcategoryTariff = $matchingTariff ?? $subcategoryTariffs->first();
+                                                                            $displayPrice = $matchingTariff ? $subcategoryTariff->price : 0;
+                                                                        @endphp
+                                                                        <option value="{{ $subcategoryTariff->id_tariff }}" data-price="{{ (float) $displayPrice }}">
+                                                                            {{ $subcategoryTariff->subCategory->name ?? 'Sin subcategoría' }}
+                                                                        </option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </td>
+                                                            <td class="service-price" id="service-price-{{ $service->id_service }}" style="padding: 10px 12px; text-align: right;">
+                                                                Automática
+                                                            </td>
+                                                            <td style="padding: 10px 12px; text-align: center;">
+                                                                <button type="button" class="btn btn-primary btn-sm" data-is-accommodation="{{ $isAcc ? '1' : '0' }}" onclick="addServiceFromList({{ $service->id_service }}, '{{ addslashes($service->name_service) }}', this)">
+                                                                    <i class="ti ti-plus"></i> Agregar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                        @endforeach
                             @if($services->isEmpty())
                             <tr><td colspan="5" style="padding: 20px; text-align: center; color: var(--qe-ink-300);">No hay servicios disponibles.</td></tr>
                             @endif
@@ -747,91 +965,70 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
     </div>
 </div>
 
-<!-- ============================================================
-     MODAL AGREGAR/CAMBIAR HOTEL PARA UN DÍA ESPECÍFICO (CORREGIDO)
-     ============================================================ -->
-<div class="modal quote-edit-page" id="modalAddAccommodationToDay" tabindex="-1" style="display:none;">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="ti ti-bed"></i> Hotel — Opción <span id="modalAccOptionLabel">1</span></h5>
-                <button type="button" class="btn-close-modal" onclick="closeAccommodationToDayModal()"><i class="ti ti-x"></i></button>
-            </div>
-            <div class="modal-body">
-                <form id="addAccommodationToDayForm">
-                    @csrf
-                    <input type="hidden" id="acc_option_number" name="option_number" value="1">
-
-                    <div class="modal-section-label"><i class="ti ti-building-skyscraper"></i> Seleccionar hotel</div>
-                    <div class="form-group">
-                        <label for="accommodation_service_select">Hotel <span class="text-danger">*</span></label>
-                        <select class="form-control" id="accommodation_service_select" name="id_service" required onchange="onAccommodationServiceSelect()">
-                            <option value="">Seleccione un hotel</option>
-                            @foreach($accommodationServices as $accService)
-                                <option value="{{ $accService->id_service }}">
-                                    {{ $accService->name_service }}
-                                    @if($accService->supplier) ({{ $accService->supplier->supplier_name }}) @endif
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="tariff-section" id="accTariffSection">
-                        <div class="tariff-header"><i class="ti ti-tag"></i> Tarifas (precio por noche)</div>
-                        <div class="form-group">
-                            <label for="acc_tariff_select">Seleccionar tarifa</label>
-                            <select class="form-control" id="acc_tariff_select" name="id_tariff" onchange="updateAccommodationToDayPricePreview()">
-                                <option value="">Cargando tarifas...</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- ===== NUEVO: SELECCIONAR DÍA ===== -->
-                    <div class="modal-section-label" style="margin-top:16px;">
-                        <i class="ti ti-calendar"></i> Seleccionar día
-                    </div>
-                    <div class="form-group">
-                        <label for="acc_day_select">Día del itinerario <span class="text-danger">*</span></label>
-                        <select class="form-control" id="acc_day_select" name="day_number" required onchange="updateAccommodationToDayPricePreview()">
-                            <option value="">Seleccione un día</option>
-                            @foreach($quote->quoteDays as $day)
-                                <option value="{{ $day->day_number }}">
-                                    Día {{ $day->day_number }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <div class="field-hint">
-                            <i class="ti ti-info-circle"></i>
-                            El hotel se asignará a este día específico.
-                        </div>
-                    </div>
-
-                    <div class="price-preview" id="accPricePreview">
-                        <i class="ti ti-calculator"></i>
-                        <div class="price-content">
-                            <span class="price-label">Precio por noche</span>
-                            <span class="price-value" id="accPricePreviewText">Selecciona un hotel para ver el precio</span>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeAccommodationToDayModal()">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnAddAccommodationToDay" onclick="addAccommodationToDay()"><i class="ti ti-device-floppy"></i> Guardar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 const CSRF_TOKEN = '{{ csrf_token() }}';
+const CONTACT_STORE_URL = '{{ route("admin.contacts.store") }}';
 const ADD_SERVICE_URL = '{{ route("admin.quotes.add-service", $quote->id_quote) }}';
 const UPDATE_SERVICE_URL_BASE = '{{ route("admin.quotes.update-service", [$quote->id_quote, "__ID__"]) }}';
 const REMOVE_SERVICE_URL_BASE = '{{ route("admin.quotes.remove-service", [$quote->id_quote, "__ID__"]) }}';
 const ADD_ACCOMMODATION_TO_DAY_URL = '{{ route("admin.quotes.add-accommodation-to-day", $quote->id_quote) }}';
 const REMOVE_ACCOMMODATION_URL_BASE = '{{ route("admin.quotes.remove-accommodation", [$quote->id_quote, "__ID__"]) }}';
+
+function openQuoteContactModal() {
+    const clientId = document.getElementById('id_client').value;
+    if (!clientId) {
+        Swal.fire({ icon: 'warning', title: 'Selecciona un cliente primero', confirmButtonColor: '#6366f1' });
+        return;
+    }
+
+    document.getElementById('quote_new_contact_id_client').value = clientId;
+    document.getElementById('modalQuoteNewContact').style.display = 'flex';
+}
+
+function closeQuoteContactModal() {
+    document.getElementById('modalQuoteNewContact').style.display = 'none';
+    document.getElementById('quoteNewContactForm').reset();
+}
+
+function saveQuoteContactModal(event) {
+    event.preventDefault();
+    const form = document.getElementById('quoteNewContactForm');
+    const formData = new FormData(form);
+    formData.set('_token', CSRF_TOKEN);
+
+    fetch(CONTACT_STORE_URL, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'No se pudo crear el contacto.');
+        }
+        return data;
+    })
+    .then((data) => {
+        closeQuoteContactModal();
+        cargarContactos();
+        setTimeout(() => {
+            const contactsSelect = document.getElementById('id_contacts');
+            for (let i = 0; i < contactsSelect.options.length; i++) {
+                if (String(contactsSelect.options[i].value) === String(data.contact.id)) {
+                    contactsSelect.value = data.contact.id;
+                    break;
+                }
+            }
+        }, 300);
+        Swal.fire({ icon: 'success', title: 'Contacto guardado', timer: 1200, showConfirmButton: false });
+    })
+    .catch((error) => {
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo crear el contacto.', confirmButtonColor: '#ef4444' });
+    });
+}
 
 // ============================================================
 // TABS DE DÍAS
@@ -951,6 +1148,21 @@ function resetServiceListFilters() {
     filterServiceList();
 }
 
+function toggleServiceAsAccommodation(el) {
+    const container = document.getElementById('service_as_acc_days');
+    if (!container) return;
+    if (el && el.checked) {
+        container.style.display = 'flex';
+    } else {
+        container.style.display = 'none';
+        // reset selects
+        const s = document.getElementById('service_acc_day_start');
+        const e = document.getElementById('service_acc_day_end');
+        if (s) s.value = '';
+        if (e) e.value = '';
+    }
+}
+
 function updateServiceRowPrice(serviceId) {
     const select = document.getElementById(`service-tariff-${serviceId}`);
     const priceCell = document.getElementById(`service-price-${serviceId}`);
@@ -977,6 +1189,100 @@ function addServiceFromList(serviceId, serviceName, button) {
         ? `Tarifa seleccionada: <strong>${selectedTariff.text}</strong>.<br>Pasajeros: <strong>${passengersCount}</strong>.`
         : `Se usará la tarifa automática según pasajeros.<br>Pasajeros: <strong>${passengersCount}</strong>.`;
 
+    // If the service button indicates this is an accommodation, open the accommodation modal (itinerario modal) prefilled
+    const isAccFromButton = button && button.dataset && (button.dataset.isAccommodation === '1' || button.dataset.isAccommodation === 'true');
+    if (isAccFromButton) {
+        // Open the existing accommodation modal, prefill service and day
+        openAccommodationToDayModal(1, currentDayNumberList);
+        setTimeout(() => {
+            const accSelect = document.getElementById('accommodation_service_select');
+            const startSel = document.getElementById('acc_day_start_select');
+            const endSel = document.getElementById('acc_day_end_select');
+            if (startSel) startSel.value = currentDayNumberList;
+            if (endSel) endSel.value = currentDayNumberList;
+            if (accSelect) {
+                accSelect.value = serviceId;
+                // ensure tariffs load
+                try { onAccommodationServiceSelect(); } catch(e) { /* ignore */ }
+            }
+        }, 120);
+        return;
+    }
+
+    // Fallback: if user used the checkbox flow (legacy), keep that behavior
+    const addAsAccCheckbox = document.getElementById('service_as_acc_checkbox');
+    const addingAsAccommodation = addAsAccCheckbox && addAsAccCheckbox.checked;
+
+    if (addingAsAccommodation) {
+        // When adding as accommodation, ask for confirmation mentioning the selected day range
+        const dayStart = document.getElementById('service_acc_day_start').value;
+        const dayEnd = document.getElementById('service_acc_day_end').value;
+
+        if (!dayStart || !dayEnd) {
+            Swal.fire({ icon: 'warning', title: 'Define el rango', text: 'Selecciona el día inicial y final para el hotel.', confirmButtonColor: '#6366f1' });
+            return;
+        }
+        if (Number(dayStart) > Number(dayEnd)) {
+            Swal.fire({ icon: 'warning', title: 'Rango inválido', text: 'El día final debe ser mayor o igual al día inicial.', confirmButtonColor: '#6366f1' });
+            return;
+        }
+
+        Swal.fire({
+            title: 'Agregar como alojamiento',
+            html: `¿Agregar <strong>${serviceName}</strong> como alojamiento desde el día <strong>${dayStart}</strong> hasta <strong>${dayEnd}</strong>?<br><small>${tariffMessage}</small>`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#6366f1',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Sí, agregar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            const original = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="ti ti-loader ti-spin"></i>';
+
+            const formData = new FormData();
+            formData.append('_token', CSRF_TOKEN);
+            // option_number: try to reuse acc_option_number if present, otherwise default to 1
+            const optEl = document.getElementById('acc_option_number');
+            formData.append('option_number', optEl ? optEl.value : 1);
+            formData.append('day_start', dayStart);
+            formData.append('day_end', dayEnd);
+            formData.append('id_service', serviceId);
+            if (selectedTariff && selectedTariff.value) {
+                formData.append('id_tariff', selectedTariff.value);
+            }
+
+            fetch(ADD_ACCOMMODATION_TO_DAY_URL, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                button.disabled = false;
+                button.innerHTML = original;
+
+                if (data.success) {
+                    Swal.fire({ icon: 'success', title: '¡Hotel guardado!', text: data.days_assigned ? `Se asignó a ${data.days_assigned} día(s).` : 'Hotel guardado correctamente.', timer: 1400, showConfirmButton: false })
+                        .then(() => window.location.reload());
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error al guardar el hotel', confirmButtonColor: '#ef4444' });
+                }
+            })
+            .catch(() => {
+                button.disabled = false;
+                button.innerHTML = original;
+                Swal.fire({ icon: 'error', title: 'Error de conexión', confirmButtonColor: '#ef4444' });
+            });
+        });
+
+        return; // handled as accommodation
+    }
+
+    // Default: add as normal service
     Swal.fire({
         title: 'Agregar servicio',
         html: `¿Agregar <strong>${serviceName}</strong> al Día ${currentDayNumberList}?<br><small>${tariffMessage}</small>`,
@@ -1186,35 +1492,75 @@ function removeService(detailId) {
 // ============================================================
 // MODAL HOSPEDAJE PARA UN DÍA ESPECÍFICO (CORREGIDO)
 // ============================================================
+function filterAccommodationServices() {
+    const searchInput = document.getElementById('accommodation_search');
+    const categoryInput = document.getElementById('accommodation_category_filter');
+    const select = document.getElementById('accommodation_service_select');
+
+    if (!select) {
+        return;
+    }
+
+    const search = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const selectedCategory = (categoryInput ? categoryInput.value : 'all');
+    let visibleCount = 0;
+
+    Array.from(select.options).forEach((option) => {
+        if (!option.value) {
+            option.hidden = false;
+            return;
+        }
+
+        const category = (option.dataset.category || '').toLowerCase();
+        const text = (option.dataset.search || option.textContent || '').toLowerCase();
+        const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
+        const matchesSearch = !search || text.includes(search);
+        const show = matchesCategory && matchesSearch;
+
+        option.hidden = !show;
+        if (show) {
+            visibleCount++;
+        }
+    });
+
+    if (visibleCount === 0) {
+        select.value = '';
+        resetAccTariffSection();
+    }
+}
+
 function openAccommodationToDayModal(optionNumber, dayNumber) {
     document.getElementById('acc_option_number').value = optionNumber;
     document.getElementById('modalAccOptionLabel').textContent = optionNumber;
 
-    // Resetear el selector de días
-    const daySelect = document.getElementById('acc_day_select');
-    daySelect.value = '';
+    const dayStartSelect = document.getElementById('acc_day_start_select');
+    const dayEndSelect = document.getElementById('acc_day_end_select');
+    const searchInput = document.getElementById('accommodation_search');
+    const categoryInput = document.getElementById('accommodation_category_filter');
 
-    // Si viene un dayNumber, preseleccionarlo
+    dayStartSelect.value = '';
+    dayEndSelect.value = '';
+    if (searchInput) searchInput.value = '';
+    if (categoryInput) categoryInput.value = 'all';
+
     if (dayNumber) {
-        daySelect.value = dayNumber;
+        dayStartSelect.value = dayNumber;
+        dayEndSelect.value = dayNumber;
     }
-
-    const modal = document.getElementById('modalAddAccommodationToDay');
-    modal.style.display = 'flex';
-    modal.classList.add('show');
-    document.body.style.overflow = 'hidden';
 
     document.getElementById('addAccommodationToDayForm').reset();
     document.getElementById('acc_option_number').value = optionNumber;
+    if (dayNumber) {
+        dayStartSelect.value = dayNumber;
+        dayEndSelect.value = dayNumber;
+    }
+    if (searchInput) searchInput.value = '';
+    if (categoryInput) categoryInput.value = 'all';
+    filterAccommodationServices();
     resetAccTariffSection();
 }
 
-function closeAccommodationToDayModal() {
-    const modal = document.getElementById('modalAddAccommodationToDay');
-    modal.style.display = 'none';
-    modal.classList.remove('show');
-    document.body.style.overflow = '';
-}
+
 
 function onAccommodationServiceSelect() {
     const select = document.getElementById('accommodation_service_select');
@@ -1289,16 +1635,23 @@ function updateAccommodationToDayPricePreview() {
 
 function addAccommodationToDay() {
     const serviceSelect = document.getElementById('accommodation_service_select');
-    const daySelect = document.getElementById('acc_day_select');
-    const dayNumber = daySelect.value;
+    const dayStartSelect = document.getElementById('acc_day_start_select');
+    const dayEndSelect = document.getElementById('acc_day_end_select');
+    const dayStart = dayStartSelect.value;
+    const dayEnd = dayEndSelect.value;
 
     if (!serviceSelect.value) {
         Swal.fire({ icon: 'warning', title: 'Selecciona un hotel', confirmButtonColor: '#6366f1' });
         return;
     }
 
-    if (!dayNumber) {
-        Swal.fire({ icon: 'warning', title: 'Selecciona un día', confirmButtonColor: '#6366f1' });
+    if (!dayStart || !dayEnd) {
+        Swal.fire({ icon: 'warning', title: 'Define el rango de días', text: 'Selecciona el día inicial y final para el hotel.', confirmButtonColor: '#6366f1' });
+        return;
+    }
+
+    if (Number(dayStart) > Number(dayEnd)) {
+        Swal.fire({ icon: 'warning', title: 'Rango inválido', text: 'El día final debe ser mayor o igual al día inicial.', confirmButtonColor: '#6366f1' });
         return;
     }
 
@@ -1308,7 +1661,8 @@ function addAccommodationToDay() {
     btn.innerHTML = '<i class="ti ti-loader ti-spin"></i> Guardando...';
 
     const formData = new FormData(document.getElementById('addAccommodationToDayForm'));
-    formData.set('day_number', dayNumber);
+    formData.set('day_start', dayStart);
+    formData.set('day_end', dayEnd);
 
     fetch(ADD_ACCOMMODATION_TO_DAY_URL, {
         method: 'POST',
@@ -1321,7 +1675,7 @@ function addAccommodationToDay() {
         btn.innerHTML = original;
 
         if (data.success) {
-            Swal.fire({ icon: 'success', title: '¡Hotel guardado!', timer: 1200, showConfirmButton: false })
+            Swal.fire({ icon: 'success', title: '¡Hotel guardado!', text: data.days_assigned ? `Se asignó a ${data.days_assigned} día(s).` : 'Hotel guardado correctamente.', timer: 1600, showConfirmButton: false })
                 .then(() => window.location.reload());
         } else {
             Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Error al guardar el hotel', confirmButtonColor: '#ef4444' });
@@ -1374,9 +1728,102 @@ function confirmDelete(id, name) {
 }
 
 
+function toggleAccommodationGroup(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (el.style.display === 'none' || getComputedStyle(el).display === 'none') ? '' : 'none';
+}
+
+function removeAccommodationGroup(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return;
+
+    Swal.fire({
+        title: '¿Eliminar hotel(s)?',
+        html: 'Se eliminarán los hoteles seleccionados. Esta acción no se puede deshacer.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#991b1b',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        const deletes = ids.map(id => {
+            const url = REMOVE_ACCOMMODATION_URL_BASE.replace('__ID__', id);
+            return fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .catch(() => ({ success: false }));
+        });
+
+        Promise.all(deletes).then(results => {
+            const failed = results.filter(r => !r || !r.success);
+            if (failed.length > 0) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Algunos hoteles no pudieron eliminarse.' });
+            } else {
+                Swal.fire({ icon: 'success', title: 'Eliminado', timer: 900, showConfirmButton: false }).then(() => window.location.reload());
+            }
+        });
+    });
+}
+
+function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd) {
+    document.getElementById('acc_option_number').value = optionNumber;
+    document.getElementById('modalAccOptionLabel').textContent = optionNumber;
+
+    const dayStartSelect = document.getElementById('acc_day_start_select');
+    const dayEndSelect = document.getElementById('acc_day_end_select');
+    const searchInput = document.getElementById('accommodation_search');
+    const categoryInput = document.getElementById('accommodation_category_filter');
+
+    // reset
+    dayStartSelect.value = '';
+    dayEndSelect.value = '';
+    if (searchInput) searchInput.value = '';
+    if (categoryInput) categoryInput.value = 'all';
+
+    // Use provided dayStart/dayEnd if present, otherwise fall back to dayNumber
+    if (typeof dayStart !== 'undefined' && dayStart !== null) {
+        dayStartSelect.value = dayStart;
+    } else if (dayNumber) {
+        dayStartSelect.value = dayNumber;
+    }
+
+    if (typeof dayEnd !== 'undefined' && dayEnd !== null) {
+        dayEndSelect.value = dayEnd;
+    } else if (dayNumber) {
+        dayEndSelect.value = dayNumber;
+    }
+
+
+    document.body.style.overflow = 'hidden';
+
+    document.getElementById('addAccommodationToDayForm').reset();
+    document.getElementById('acc_option_number').value = optionNumber;
+
+    // Set again after reset
+    if (typeof dayStart !== 'undefined' && dayStart !== null) {
+        dayStartSelect.value = dayStart;
+    } else if (dayNumber) {
+        dayStartSelect.value = dayNumber;
+    }
+
+    if (typeof dayEnd !== 'undefined' && dayEnd !== null) {
+        dayEndSelect.value = dayEnd;
+    } else if (dayNumber) {
+        dayEndSelect.value = dayNumber;
+    }
+
+    if (searchInput) searchInput.value = '';
+    if (categoryInput) categoryInput.value = 'all';
+    filterAccommodationServices();
+    resetAccTariffSection();
+}
+
 function cargarContactos() {
     var clientId = document.getElementById('id_client').value;
     var contactsSelect = document.getElementById('id_contacts');
+    var currentValue = contactsSelect.value;
     contactsSelect.innerHTML = '<option value="">Cargando...</option>';
 
     if (!clientId) {
@@ -1394,14 +1841,34 @@ function cargarContactos() {
                 opt.text = c.name + ' ' + (c.last_names || '');
                 contactsSelect.appendChild(opt);
             });
+
+            if (currentValue) {
+                var matched = Array.from(contactsSelect.options).some(function(option) {
+                    return option.value == currentValue;
+                });
+                if (matched) {
+                    contactsSelect.value = currentValue;
+                }
+            }
         })
         .catch(() => { contactsSelect.innerHTML = '<option value="">Error al cargar</option>'; });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var quoteNewContactForm = document.getElementById('quoteNewContactForm');
+    if (quoteNewContactForm) {
+        quoteNewContactForm.addEventListener('submit', saveQuoteContactModal);
+    }
+    if (document.getElementById('id_client')) {
+        cargarContactos();
+    }
+});
 
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeAddServiceModal();
         closeAccommodationToDayModal();
+        closeQuoteContactModal();
     }
 });
 </script>

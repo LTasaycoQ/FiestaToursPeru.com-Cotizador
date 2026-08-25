@@ -148,17 +148,36 @@ class ContactController extends Controller
                 'es_principal' => $request->boolean('es_principal'),
             ]);
 
-            // ✅ Redirigir a la página de productos del proveedor (donde estás)
+            if ($request->ajax() || $request->wantsJson() || $request->expectsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Contacto creado correctamente.',
+                    'contact' => [
+                        'id' => $contact->id_contacts,
+                        'name' => $contact->name,
+                        'last_names' => $contact->last_names,
+                        'full_name' => trim($contact->name.' '.$contact->last_names),
+                    ],
+                ], 201);
+            }
+
             if ($request->has('id_supplier') && $request->id_supplier) {
                 return redirect()->route('admin.suppliers.productos', $request->id_supplier)
                     ->with('success', 'Contacto creado correctamente.')
-                    ->with('tab', 'contacts'); // Para activar la pestaña de contactos
+                    ->with('tab', 'contacts');
             }
 
             return redirect()->route('admin.contacts.index')
                 ->with('success', 'Contacto creado correctamente.');
 
         } catch (\Exception $e) {
+            if ($request->ajax() || $request->wantsJson() || $request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al crear el contacto: '.$e->getMessage(),
+                ], 422);
+            }
+
             if ($request->has('id_supplier') && $request->id_supplier) {
                 return redirect()->route('admin.suppliers.productos', $request->id_supplier)
                     ->with('error', 'Error al crear el contacto: ' . $e->getMessage());

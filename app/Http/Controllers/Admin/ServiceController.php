@@ -62,9 +62,11 @@ class ServiceController extends Controller
             'id_category' => 'required|exists:service_category,id_category',
             'id_labels' => 'nullable|exists:labels,id_labels',
             'description' => 'nullable|string|max:900',
-            'availability_days' => 'nullable|string|max:50',
+            'availability_days' => 'nullable|string',
             'status' => 'nullable|string|max:20',
         ]);
+
+        $defaultWeekDays = 'Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo';
 
         $service = Service::create([
             'name_service' => $validated['name_service'],
@@ -72,7 +74,7 @@ class ServiceController extends Controller
             'id_category' => $validated['id_category'],
             'id_labels' => $validated['id_labels'] ?? null,
             'description' => $validated['description'] ?? null,
-            'availability_days' => $validated['availability_days'] ?? null,
+            'availability_days' => $validated['availability_days'] ?? $defaultWeekDays,
             'pricing_type' => null,
             'status' => $validated['status'] ?? 'active',
         ]);

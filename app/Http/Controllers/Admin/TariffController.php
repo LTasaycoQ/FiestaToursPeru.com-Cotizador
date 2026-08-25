@@ -90,6 +90,18 @@ class TariffController extends Controller
             ? "{$created} subcategoría(s) registrada(s). Ahora asigna el precio en cada una."
             : 'Todas las subcategorías ya tienen tarifa asignada.';
 
+        // If the service has no availability days set, default to full week (Lunes a Domingo)
+        try {
+            $service = Service::find($serviceId);
+            if ($service && empty(trim((string) $service->availability_days))) {
+                $weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                $service->availability_days = implode(', ', $weekDays);
+                $service->save();
+            }
+        } catch (\Exception $e) {
+            // Non-fatal: don't block the flow if availability update fails
+        }
+
         return redirect()
             ->route('admin.tariffs.index', $serviceId)
             ->with('success', $message);

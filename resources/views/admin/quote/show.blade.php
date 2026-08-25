@@ -18,7 +18,7 @@
 .badge-status.expired { background: #fef3c7; color: #92400e; } .badge-status.expired .badge-dot { background: #f59e0b; }
 .badge-status.cancelled { background: #f1f5f9; color: #64748b; } .badge-status.cancelled .badge-dot { background: #94a3b8; }
 
-.btn { padding: 8px 16px; border-radius: 8px; font-weight: 500; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: none; font-size: 13px; }
+.btn { padding:10px; border-radius: 50px; font-weight: 500; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: none; font-size: 15px; }
 .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
 .btn-secondary:hover { background: #e2e8f0; border-color: #cbd5e1; color: #0f172a; }
 .btn-warning { background: #f59e0b; color: #fff; } .btn-warning:hover { background: #d97706; }
@@ -197,7 +197,8 @@
                 <div class="card-header">
                     <div class="header-left" style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
                         <a href="{{ route('admin.quotes.index') }}" class="btn btn-secondary">
-                            <i class="ti ti-arrow-left"></i> Volver
+                            <i class="ti ti-chevron-left"></i>
+
                         </a>
                         <div>
                             <h3 style="font-size:20px; font-weight:700; color:#0f172a; margin:0; display:flex; align-items:center; gap:10px;">
@@ -214,9 +215,19 @@
                         <a href="{{ route('admin.quotes.edit', $quote->id_quote) }}" class="btn btn-warning">
                             <i class="ti ti-edit"></i> Editar
                         </a>
-                        <button class="btn btn-danger" onclick="confirmDelete({{ $quote->id_quote }}, '{{ addslashes($quote->name ?? 'Cotización') }}')">
-                            <i class="ti ti-trash"></i> Eliminar
-                        </button>
+                       <div class="info-box avatar_info_box" style="background:transparent; border:none; padding:0; margin:0; display:flex; align-items:center; gap:8px;">
+                            @if($quote->user && $quote->user->avatar)
+                                @php $filename = basename($quote->user->avatar); @endphp
+                                <img class="img_avatar_user" style="width: 50px; height: 50px; border-radius: 50%;" src="{{ route('avatar.show', $filename) }}" alt="{{ $quote->user->name }}" />
+
+                                <div style="display:flex; flex-direction:column; justify-content:center;">
+                                    <span style="margin-left: 10px; font-weight: 500; font-size: 14px;">{{ $quote->user ? $quote->user->name : '-' }}</span>
+                                    <span style="margin-left: 10px; font-size: 12px; color: #94a3b8;">creador</span>
+                                </div>
+                            @else
+                                 {{ strtoupper(substr($quote->user ? $quote->user->name : '-', 0, 2)) }}
+                            @endif
+                        </div>
                     </div>
                 </div>
 
@@ -246,10 +257,7 @@
                             <span class="label"><i class="icon ti ti-phone"></i> Contacto</span>
                             <p class="value">{{ $quote->contact ? $quote->contact->name . ' ' . $quote->contact->last_names : 'N/A' }}</p>
                         </div>
-                        <div class="info-box">
-                            <span class="label"><i class="icon ti ti-user-circle"></i> Creador</span>
-                            <p class="value">{{ $quote->user ? $quote->user->name : '-' }}</p>
-                        </div>
+                       
 
                         <div class="info-box">
                             <span class="label"><i class="icon ti ti-users"></i> Pasajeros</span>
@@ -478,34 +486,5 @@
     </div>
 </div>
 
-@push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-function confirmDelete(id, name) {
-    Swal.fire({
-        title: '¿Eliminar cotización?',
-        html: `Estás a punto de eliminar <strong>${name}</strong>.<br>Esta acción no se puede deshacer.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#991b1b',
-        cancelButtonColor: '#94a3b8',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/cotizaciones/${id}`;
-            form.innerHTML = `
-                <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="_method" value="DELETE">
-            `;
-            document.body.appendChild(form);
-            form.submit();
-        }
-    });
-}
-</script>
-@endpush
 
 @endsection

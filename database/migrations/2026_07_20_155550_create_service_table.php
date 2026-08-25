@@ -31,7 +31,7 @@ return new class extends Migration
 
             $table->string('description', 900)->nullable();
             $table->string('imagen', 300)->nullable();
-            $table->string('availability_days', 50)->nullable();
+            $table->string('availability_days', 100)->nullable();
             $table->enum('pricing_type', ['flat', 'tiered'])->nullable();
             $table->string('status', 20)->default('active');
             $table->timestamps();

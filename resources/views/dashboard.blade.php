@@ -3,7 +3,6 @@
 
 @push('styles')
 <style>
-/* ── PAGE HEADER ── */
 .dash-header {
     display: flex;
     align-items: center;
@@ -17,7 +16,6 @@
 .dash-sub { font-size: .8rem; color: #94a3b8; margin-top: .2rem; }
 .dash-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 
-/* ── STATS GRID ── */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);

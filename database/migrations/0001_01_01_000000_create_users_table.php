@@ -17,6 +17,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('avatar', 300)->nullable();
+            // $table->string('img_firma', 300)->nullable();
             $table->enum('role', ['admin', 'usuario'])->default('usuario'); 
             $table->rememberToken();
             $table->timestamps();

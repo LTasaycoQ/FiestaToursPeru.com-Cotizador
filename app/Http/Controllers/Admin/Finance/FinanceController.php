@@ -295,17 +295,31 @@ class FinanceController extends Controller
 
     public function destroy($id)
     {
+        DB::beginTransaction();
         try {
-            $project = ProyectModel::findOrFail($id);
+            $project = ProyectModel::with('balance', 'expenses')->findOrFail($id);
 
+            // Eliminar gastos asociados
+            if ($project->expenses()->exists()) {
+                \App\Models\Finance\ProjectExpenseModel::where('id_proyect', $id)->delete();
+            }
+
+            // Eliminar recargas asociadas al balance
             if ($project->balance) {
+                \App\Models\Finance\BalanceRecharges::where('id_balance', $project->balance->id_balance)->delete();
+
+                // Eliminar balance
                 $project->balance->delete();
             }
 
+            // Finalmente eliminar el proyecto
             $project->delete();
+
+            DB::commit();
 
             return redirect()->route('finance.index')->with('success', 'Eliminado Correctamente');
         } catch (\Exception $e) {
+            DB::rollBack();
             return redirect()->route('finance.index')
                 ->with('error', 'Error al eliminar el proyecto: '.$e->getMessage());
         }

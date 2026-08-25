@@ -18,7 +18,7 @@ class UserSeeder extends Seeder
         ]);
 
         User::create([
-            'name' => 'Luis Angel Tasayco Quispe',
+            'name' => 'Luis Tasayco',
             'email' => 'dw@fiestatoursperu.com',
             'password' => Hash::make('admin123'),
             'role' => 'admin',

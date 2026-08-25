@@ -988,9 +988,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ============================================================
-    // MENÚ DESPLEGABLE DE ESTADO
-    // ============================================================
     window.toggleStatusMenu = function(element, event) {
         if (event) event.stopPropagation();
 
@@ -998,7 +995,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var dropdown = document.querySelector('.quote-status-menu[data-id="' + id + '"]');
         if (!dropdown) return;
 
-        // Cerrar otros menús de acción
         document.querySelectorAll('.quote-action-menu.show').forEach(function(menu) {
             menu.classList.remove('show');
         });

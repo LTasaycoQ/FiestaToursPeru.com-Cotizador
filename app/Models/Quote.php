@@ -284,33 +284,43 @@ class Quote extends Model
 
     public static function generateCorrelative(string $startDate): string
     {
-        $date = new \DateTime($startDate);
-        $year = $date->format('Y');
-        $month = $date->format('m');
+        $date = new \DateTimeImmutable($startDate);
+        $month = (int) $date->format('m');
+        $year = $date->format('y');
+        $yearFull = $date->format('Y');
 
-        $lastCorrelative = self::where('correlative', 'LIKE', "{$month}-%-{$year}")
+        $lastNumber = 100;
+        $existingCorrelatives = self::query()
             ->whereNotNull('correlative')
-            ->orderBy('correlative', 'asc')
-            ->first();
+            ->whereMonth('start_date', $month)
+            ->whereYear('start_date', $yearFull)
+            ->pluck('correlative')
+            ->filter();
 
-        if ($lastCorrelative && $lastCorrelative->correlative) {
-            $parts = explode('-', $lastCorrelative->correlative);
-            $lastNumber = intval($parts[1] ?? 101);
-            $nextNumber = $lastNumber - 1;
-        } else {
-            $nextNumber = 101;
+        foreach ($existingCorrelatives as $correlative) {
+            $parts = preg_split('/-/', trim((string) $correlative));
+            if (count($parts) !== 3) {
+                continue;
+            }
+
+            $number = (int) ($parts[1] ?? 0);
+            if ($number > $lastNumber) {
+                $lastNumber = $number;
+            }
         }
 
-        if ($nextNumber < 0) {
-            Log::warning('Se alcanzó el límite inferior de correlativos para el mes', [
+        $nextNumber = $lastNumber >= 101 ? $lastNumber + 1 : 101;
+
+        if ($nextNumber > 999) {
+            Log::warning('Se alcanzó el límite superior de correlativos para el mes', [
                 'month' => $month,
-                'year' => $year,
-                'last_correlative' => $lastCorrelative->correlative ?? 'null'
+                'year' => $yearFull,
+                'last_number' => $lastNumber,
             ]);
             $nextNumber = 101;
         }
 
-        return "{$month}-" . str_pad($nextNumber, 3, '0', STR_PAD_LEFT) . "-{$year}";
+        return sprintf('%02d-%03d-%02d', $month, $nextNumber, $year);
     }
 
     public function assignCorrelative(): bool
@@ -346,19 +356,19 @@ class Quote extends Model
 
     public function isValidCorrelative(): bool
     {
-        if (!$this->correlative) {
+        if (! $this->correlative) {
             return false;
         }
 
-        $pattern = '/^\d{2}-\d{3}-\d{4}$/';
-        if (!preg_match($pattern, $this->correlative)) {
+        $pattern = '/^\d{2}-\d{3}-\d{2}$/';
+        if (! preg_match($pattern, $this->correlative)) {
             return false;
         }
 
         $parts = explode('-', $this->correlative);
         $number = intval($parts[1]);
 
-        return $number >= 0 && $number <= 101;
+        return $number >= 100;
     }
 
     // ============================================================
