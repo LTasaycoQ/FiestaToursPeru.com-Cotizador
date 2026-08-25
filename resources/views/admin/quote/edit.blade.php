@@ -1050,22 +1050,28 @@ function syncDetailPrice(detailId) {
     }
 }
 
-function updateServiceDetail(detailId) {
+function updateServiceDetail(detailId, options = {}) {
+    const silent = options.silent || false;
+
     const tariffSelect = document.getElementById(`detail-tariff-${detailId}`);
     const priceInput = document.getElementById(`detail-price-${detailId}`);
     const quantityInput = document.getElementById(`detail-quantity-${detailId}`);
     const saveButton = document.querySelector(`#detail-${detailId} .detail-editor button`);
-    const originalHtml = saveButton.innerHTML;
+    const originalHtml = saveButton ? saveButton.innerHTML : '';
     const unitPrice = Number(priceInput.value);
     const quantity = Number(quantityInput.value);
 
     if (!tariffSelect.value || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isInteger(quantity) || quantity < 1) {
-        Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Selecciona una tarifa, un precio válido y una cantidad mayor que cero.' });
+        if (!silent) {
+            Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Selecciona una tarifa, un precio válido y una cantidad mayor que cero.' });
+        }
         return;
     }
 
-    saveButton.disabled = true;
-    saveButton.innerHTML = '<i class="ti ti-loader ti-spin"></i>';
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<i class="ti ti-loader ti-spin"></i>';
+    }
 
     const formData = new FormData();
     formData.append('_token', CSRF_TOKEN);
@@ -1085,13 +1091,25 @@ function updateServiceDetail(detailId) {
                 throw new Error(data.message || 'No se pudo actualizar el servicio.');
             }
 
-            document.getElementById(`detail-subtotal-${detailId}`).textContent = `$ ${data.subtotal}`;
-            Swal.fire({ icon: 'success', title: 'Servicio actualizado', timer: 1100, showConfirmButton: false });
+            const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
+            if (subtotalEl) subtotalEl.textContent = `$ ${data.subtotal}`;
+
+            if (!silent) {
+                Swal.fire({ icon: 'success', title: 'Servicio actualizado', timer: 1100, showConfirmButton: false });
+            }
         })
-        .catch(error => Swal.fire({ icon: 'error', title: 'Error', text: error.message }))
+        .catch(error => {
+            if (!silent) {
+                Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+            } else {
+                console.error('Auto-save error for detail ' + detailId + ':', error.message);
+            }
+        })
         .finally(() => {
-            saveButton.disabled = false;
-            saveButton.innerHTML = originalHtml;
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalHtml;
+            }
         });
 }
 
@@ -1862,6 +1880,44 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('id_client')) {
         cargarContactos();
     }
+
+    // Debounce helper for auto-save
+    function debounce(fn, wait) {
+        let timer = null;
+        return function(...args) {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    // Auto-save wrapper that calls updateServiceDetail in silent mode
+    function autoSaveDetail(detailId) {
+        try {
+            updateServiceDetail(detailId, { silent: true });
+        } catch (e) {
+            console.error('autoSaveDetail error', e);
+        }
+    }
+
+    // Attach listeners to tariff selects so changing category syncs price and triggers save
+    document.querySelectorAll('[id^="detail-tariff-"]').forEach(function(el) {
+        const parts = el.id.split('-');
+        const detailId = parts[parts.length - 1];
+        const debounced = debounce(() => autoSaveDetail(detailId), 600);
+        el.addEventListener('change', function() {
+            try { syncDetailPrice(detailId); } catch(e) { /* ignore */ }
+            debounced();
+        });
+    });
+
+    // Attach listeners to price and quantity inputs to auto-save on input (debounced)
+    document.querySelectorAll('[id^="detail-price-"], [id^="detail-quantity-"]').forEach(function(el) {
+        const parts = el.id.split('-');
+        const detailId = parts[parts.length - 1];
+        const debounced = debounce(() => autoSaveDetail(detailId), 700);
+        el.addEventListener('input', debounced);
+    });
+
 });
 
 document.addEventListener('keydown', function(e) {
