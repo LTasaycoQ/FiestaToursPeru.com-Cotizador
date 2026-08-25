@@ -43,8 +43,7 @@
 .btn-primary { background: var(--qe-ink-900); color: #fff; }
 .btn-primary:hover { background: #1e293b; }
 .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-.btn-danger { background: var(--qe-danger); color: #fff; }
-.btn-danger:hover { background: var(--qe-danger-600); }
+.btn-danger {background-color:transparent; color: #b32a2a; }
 .btn-icon { padding: 9px; width: 38px; height: 38px; }
 .btn-sm { padding: 6px 12px; font-size: 12px; }
 
@@ -420,7 +419,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy"></i> Actualizar Cotización</button>
-                            <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">Cancelar</a>
+                            {{-- <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">Cancelar</a> --}}
                         </div>
                     </form>
 
@@ -527,13 +526,15 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                             <label for="detail-quantity-{{ $detail->id_detail_quote }}">Pasajeros</label>
                                                             <input type="number" class="form-control quantity-input" id="detail-quantity-{{ $detail->id_detail_quote }}" value="{{ $detail->quantity ?: ($quote->passengers_count ?: 1) }}" min="1" step="1" aria-label="Cantidad de pasajeros">
                                                         </div>
-                                                        <button type="button" class="btn btn-primary btn-sm" onclick="updateServiceDetail({{ $detail->id_detail_quote }})" title="Guardar tarifa y precio">
-                                                            <i class="ti ti-device-floppy"></i>
-                                                        </button>
+                                                        
                                                     </div>
                                                     <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}">$ {{ number_format($detail->subtotal ?? 0, 2) }}</span>
                                                     <button type="button" class="btn btn-danger btn-icon btn-sm" onclick="removeService({{ $detail->id_detail_quote }})" title="Eliminar">
                                                         <i class="ti ti-trash"></i>
+                                                    </button>
+
+                                                    <button type="button" class="btn btn-primary btn-sm" onclick="updateServiceDetail({{ $detail->id_detail_quote }})" title="Guardar tarifa y precio">
+                                                        <i class="ti ti-device-floppy"></i>
                                                     </button>
                                                 </div>
                                             </div>
