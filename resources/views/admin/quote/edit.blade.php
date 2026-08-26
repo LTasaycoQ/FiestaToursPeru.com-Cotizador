@@ -1077,7 +1077,10 @@ function updateServiceDetail(detailId, options = {}) {
     const formData = new FormData();
     formData.append('_token', CSRF_TOKEN);
     formData.append('_method', 'PUT');
-    formData.append('id_tariff', tariffSelect.value);
+    // Only include id_tariff when a tariff is selected (nullable on server)
+    if (tariffSelect && tariffSelect.value) {
+        formData.append('id_tariff', tariffSelect.value);
+    }
     formData.append('unit_price', unitPrice.toFixed(2));
     formData.append('quantity', quantity);
 

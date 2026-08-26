@@ -783,25 +783,48 @@ class QuoteController extends Controller
         }
 
         $data = $request->validate([
-            'id_tariff' => 'required|exists:tariff,id_tariff',
-            'unit_price' => 'required|numeric|min:0',
+            'id_tariff' => 'nullable|exists:tariff,id_tariff',
+            'unit_price' => 'nullable|numeric|min:0',
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $tariff = Tariff::where('id_tariff', $data['id_tariff'])
-            ->where('id_service', $detail->id_service)
-            ->whereNull('id_season')
-            ->where('status', 'active')
-            ->firstOrFail();
+        // If id_tariff provided, use it; otherwise try to resolve a tariff automatically
+        if (! empty($data['id_tariff'])) {
+            $tariff = Tariff::where('id_tariff', $data['id_tariff'])
+                ->where('id_service', $detail->id_service)
+                ->whereNull('id_season')
+                ->where('status', 'active')
+                ->firstOrFail();
 
-        $unitPrice = $this->resolveTariffPrice($tariff, $data['quantity']);
+            $unitPrice = $this->resolveTariffPrice($tariff, $data['quantity']);
 
-        $detail->update([
-            'id_tariff' => $tariff->id_tariff,
-            'unit_price' => $unitPrice,
-            'quantity' => $data['quantity'],
-            'subtotal' => $unitPrice * $data['quantity'],
-        ]);
+            $detail->update([
+                'id_tariff' => $tariff->id_tariff,
+                'unit_price' => $unitPrice,
+                'quantity' => $data['quantity'],
+                'subtotal' => $unitPrice * $data['quantity'],
+            ]);
+        } else {
+            // No tariff selected: try to find an appropriate tariff for this service
+            $service = Service::find($detail->id_service);
+            $tariff = $this->getTariffForService($service, $data['quantity'], $quote);
+
+            if (! $tariff) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay una tarifa activa disponible para este servicio.',
+                ], 422);
+            }
+
+            $unitPrice = $this->resolveTariffPrice($tariff, $data['quantity']);
+
+            $detail->update([
+                'id_tariff' => $tariff->id_tariff,
+                'unit_price' => $unitPrice,
+                'quantity' => $data['quantity'],
+                'subtotal' => $unitPrice * $data['quantity'],
+            ]);
+        }
 
         $quote->calculateTotals(1);
 
