@@ -21,7 +21,7 @@ return new class extends Migration
 
             // Datos del detalle
             $table->integer('quantity')->default(1)->comment('Cantidad contratada del servicio');
-
+            $table->string('notes', 600)->nullable()->comment('Descripcion adicional del detalle de la cotización');
             // Precios
             $table->decimal('unit_price', 12, 2)->default(0)->comment('Precio unitario de la tarifa');
             $table->decimal('subtotal', 12, 2)->default(0)->comment('Subtotal = unit_price * quantity');

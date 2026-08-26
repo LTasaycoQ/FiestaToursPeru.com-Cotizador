@@ -1044,10 +1044,25 @@ function switchDayTab(tabEl) {
 function syncDetailPrice(detailId) {
     const tariffSelect = document.getElementById(`detail-tariff-${detailId}`);
     const priceInput = document.getElementById(`detail-price-${detailId}`);
-    const selectedOption = tariffSelect.options[tariffSelect.selectedIndex];
+    const quantityInput = document.getElementById(`detail-quantity-${detailId}`);
+    const selectedOption = tariffSelect ? tariffSelect.options[tariffSelect.selectedIndex] : null;
 
-    if (selectedOption) {
-        priceInput.value = Number(selectedOption.dataset.price || 0).toFixed(2);
+    if (selectedOption && priceInput) {
+        const numericPrice = Number(String(selectedOption.dataset.price || 0).replace(',', '.')) || 0;
+        priceInput.value = numericPrice.toFixed(2);
+    }
+
+    try {
+        const priceRaw = priceInput ? String(priceInput.value || '0').replace(',', '.') : '0';
+        const qtyRaw = quantityInput ? String(quantityInput.value || '0').replace(',', '.') : '0';
+        const price = Number(priceRaw) || 0;
+        const qty = Number(qtyRaw) || 0;
+        const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
+        if (subtotalEl) {
+            subtotalEl.textContent = `$ ${(price * qty).toFixed(2)}`;
+        }
+    } catch (e) {
+        console.error('syncDetailPrice error', e);
     }
 }
 
@@ -1059,10 +1074,10 @@ function updateServiceDetail(detailId, options = {}) {
     const quantityInput = document.getElementById(`detail-quantity-${detailId}`);
     const saveButton = document.querySelector(`#detail-${detailId} .detail-editor button`);
     const originalHtml = saveButton ? saveButton.innerHTML : '';
-    const unitPrice = Number(priceInput.value);
-    const quantity = Number(quantityInput.value);
+    const unitPrice = Number(String(priceInput.value || '0').replace(',', '.'));
+    const quantity = parseInt(String(quantityInput.value || '0'), 10) || 0;
 
-    if (!tariffSelect.value || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isInteger(quantity) || quantity < 1) {
+    if (!tariffSelect || !tariffSelect.value || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isInteger(quantity) || quantity < 1) {
         if (!silent) {
             Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Selecciona una tarifa, un precio válido y una cantidad mayor que cero.' });
         }
@@ -1077,7 +1092,6 @@ function updateServiceDetail(detailId, options = {}) {
     const formData = new FormData();
     formData.append('_token', CSRF_TOKEN);
     formData.append('_method', 'PUT');
-    // Only include id_tariff when a tariff is selected (nullable on server)
     if (tariffSelect && tariffSelect.value) {
         formData.append('id_tariff', tariffSelect.value);
     }
@@ -1097,6 +1111,9 @@ function updateServiceDetail(detailId, options = {}) {
 
             const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
             if (subtotalEl) subtotalEl.textContent = `$ ${data.subtotal}`;
+            if (priceInput && data.unit_price) {
+                priceInput.value = Number(String(data.unit_price).replace(',', '.')).toFixed(2);
+            }
 
             if (!silent) {
                 Swal.fire({ icon: 'success', title: 'Servicio actualizado', timer: 1100, showConfirmButton: false });
