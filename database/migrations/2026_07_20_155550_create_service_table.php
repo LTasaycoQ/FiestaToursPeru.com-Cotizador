@@ -29,7 +29,6 @@ return new class extends Migration
                 ->constrained('labels', 'id_labels')
                 ->nullOnDelete();
 
-            $table->string('description', 900)->nullable();
             $table->string('imagen', 300)->nullable();
             $table->string('availability_days', 100)->nullable();
             $table->enum('pricing_type', ['flat', 'tiered'])->nullable();

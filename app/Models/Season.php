@@ -13,6 +13,7 @@ class Season extends Model
     public $timestamps = true;
 
     protected $fillable = [
+        'id_service',
         'name',
         'start_date',
         'end_date',

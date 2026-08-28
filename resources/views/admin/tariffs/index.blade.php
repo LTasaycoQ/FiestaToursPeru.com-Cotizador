@@ -3,18 +3,44 @@
 @section('title', 'Tarifas - ' . $service->name_service)
 
 @section('content')
+@section('pageContentClass', 'no-padding')
 <style>
     .tariffs-wrapper {
-        padding: 1.8rem 2rem;
+        min-height: calc(100vh - 60px);
+        background: #f8fafc;
     }
 
     .tariffs-header {
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 1.2rem 2rem;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1.5rem;
         flex-wrap: wrap;
         gap: 1rem;
+    }
+
+    .tariffs-header .avatar-large {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .tariffs-header .header-identity {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex: 1;
+        min-width: 260px;
     }
 
     .tariffs-header .header-title h1 {
@@ -159,6 +185,38 @@
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         overflow: hidden;
+    }
+
+    .tariff-content-nav {
+        display: flex;
+        gap: 8px;
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0 2rem;
+    }
+
+    .tariff-content-nav button {
+        border: 0;
+        background: transparent;
+        color: #64748b;
+        padding: 12px 18px;
+        font-weight: 600;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+    }
+
+    .tariff-content-nav button.active {
+        color: #0f172a;
+        border-bottom-color: #0f172a;
+    }
+
+    .tariff-tab-panel {
+        display: none;
+        padding: 1.8rem 2rem;
+    }
+
+    .tariff-tab-panel.active {
+        display: block;
     }
 
     .card-header {
@@ -701,7 +759,9 @@
     }
 
     @media (max-width: 768px) {
-        .tariffs-wrapper { padding: 1rem; }
+        .tariffs-header,
+        .tariff-content-nav,
+        .tariff-tab-panel { padding-left: 1rem; padding-right: 1rem; }
         .tariffs-header { flex-direction: column; align-items: stretch; }
         .tariffs-header .header-actions { justify-content: flex-end; }
         .modal-overlay .modal-box { max-width: 100%; margin: 1rem; padding: 1.5rem 1.2rem; }
@@ -763,20 +823,23 @@
 
 <div class="tariffs-wrapper">
     <div class="tariffs-header">
-        <div class="header-title">
-            <h1>Tarifas</h1>
-            <p>
-                <strong>Servicio:</strong> {{ $service->name_service }}
-                <span class="mx-2">|</span>
-                <strong>Proveedor:</strong> {{ $service->supplier->supplier_name ?? 'N/A' }}
-                <span class="mx-2">|</span>
-                <strong>Categoría:</strong> {{ $service->category->name ?? 'N/A' }}
-                <span class="mx-2">|</span>
-                <strong>Tipo:</strong> {{ $service->pricing_type === 'flat' ? 'Precio por persona' : 'Por rangos de personas' }}
-            </p>
+        <div class="header-identity">
+            <div class="avatar-large">
+                {{ strtoupper(substr($service->name_service, 0, 2)) }}
+            </div>
+            <div class="header-title">
+                <h1>{{ $service->name_service }}</h1>
+                <p>
+                    <strong>Tarifas</strong>
+                    <span class="mx-2">|</span>
+                    {{ $service->supplier->supplier_name ?? 'Sin proveedor' }}
+                    <span class="mx-2">|</span>
+                    {{ $service->category->name ?? 'Sin categoría' }}
+                </p>
+            </div>
         </div>
         <div class="header-actions">
-            <a href="{{ route('admin.suppliers.show', $service->id_supplier) }}" class="btn btn-secondary">
+            <a href="{{ route('admin.suppliers.productos', $service->id_supplier) }}" class="btn btn-secondary">
                 <i class="ti ti-arrow-left"></i> Volver al Proveedor
             </a>
             <button class="btn btn-primary" onclick="openCreateTariffModal()">
@@ -786,11 +849,64 @@
     </div>
 
 
+    <div class="tariff-content-nav">
+        <button type="button" class="active" data-tariff-tab="tariff-info">
+            <i class="ti ti-info-circle"></i> Información
+        </button>
+        <button type="button" data-tariff-tab="tariff-types">
+            <i class="ti ti-category"></i> Tipos de servicio y tarifas
+        </button>
+    </div>
+
+    <div id="tariff-info" class="tariff-tab-panel active">
+        @php
+            $descriptionByLanguage = $service->descriptions
+                ->mapWithKeys(fn ($description) => [$description->id_language => $description->description])
+                ->toArray();
+            $defaultLanguage = $languages->firstWhere('code', 'es') ?? $languages->first();
+        @endphp
+        <div class="card" style="padding:1.5rem;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+                <div><small style="color:#64748b;">Servicio</small><div style="font-weight:700;color:#0f172a;">{{ $service->name_service }}</div></div>
+                <div><small style="color:#64748b;">Proveedor</small><div style="font-weight:700;color:#0f172a;">{{ $service->supplier?->supplier_name ?? 'Sin proveedor' }}</div></div>
+                <div><small style="color:#64748b;">Categoría</small><div style="font-weight:700;color:#0f172a;">{{ $service->category?->name ?? 'Sin categoría' }}</div></div>
+            </div>
+            <form method="POST" action="{{ route('admin.services.descriptions.store', $service->id_service) }}">
+                @csrf
+                <label for="serviceLanguage" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Idioma</label>
+                <select name="id_language" id="serviceLanguage" required style="width:100%;height:42px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px;margin-bottom:14px;">
+                    @foreach($languages->sortBy(fn ($language) => $language->code === 'es' ? 0 : 1) as $language)
+                        <option value="{{ $language->id_language }}">{{ $language->name }} ({{ strtoupper($language->code) }})</option>
+                    @endforeach
+                </select>
+                <label for="serviceDescription" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Descripción</label>
+                <textarea name="description" id="serviceDescription" rows="6" required maxlength="5000" placeholder="Escribe la descripción del servicio..." style="width:100%;border:1px solid #dbe3ef;border-radius:8px;padding:10px;resize:vertical;"></textarea>
+                <button type="submit" class="btn btn-primary" style="margin-top:12px;"><i class="ti ti-device-floppy"></i> Guardar descripción</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="tariff-types" class="tariff-tab-panel">
     <div class="card" id="tariffsListCard">
         <div class="card-header">
             <h5><i class="ti ti-coin"></i> Lista de Tarifas</h5>
             <span class="badge badge-secondary">{{ $paginator->total() }} subcategorías</span>
         </div>
+            <div style="padding:14px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+                <strong>{{ $service->name_service }}</strong>
+                <span style="margin-left:12px;color:#64748b;">Proveedor: {{ $service->supplier?->supplier_name ?? 'Sin proveedor' }}</span>
+                @if($service->descriptions->isNotEmpty())
+                    <div style="margin-top:5px;color:#64748b;font-size:13px;">
+                        @foreach($service->descriptions as $description)
+                            @if($description->description)
+                                <span title="{{ $description->description }}">
+                                    {{ $description->language?->name }}: {{ \Illuminate\Support\Str::limit($description->description, 120) }}
+                                </span>@if(!$loop->last) <span style="margin:0 8px;">·</span> @endif
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         <div class="card-body">
             @if(session('success'))
                 <div class="alert alert-success">
@@ -953,6 +1069,7 @@
 
         
     </div>
+    </div>
 
 </div>
 
@@ -1029,6 +1146,29 @@
 const CSRF_TOKEN = '{{ csrf_token() }}';
 const DELETE_SUBCATEGORY_URL_BASE = '/servicios/{{ $service->id_service }}/tarifas/subcategoria';
 const AVAILABILITY_URL = '{{ route('admin.services.update-availability', $service->id_service) }}';
+const SERVICE_DESCRIPTIONS = @json($descriptionByLanguage);
+const DEFAULT_SERVICE_LANGUAGE = @json($defaultLanguage?->id_language);
+
+function loadServiceDescription() {
+    const language = document.getElementById('serviceLanguage').value;
+    document.getElementById('serviceDescription').value = SERVICE_DESCRIPTIONS[language] || '';
+}
+
+document.getElementById('serviceLanguage')?.addEventListener('change', loadServiceDescription);
+document.querySelectorAll('[data-tariff-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+        document.querySelectorAll('[data-tariff-tab]').forEach((item) => item.classList.remove('active'));
+        document.querySelectorAll('.tariff-tab-panel').forEach((panel) => panel.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById(button.dataset.tariffTab).classList.add('active');
+    });
+});
+document.addEventListener('DOMContentLoaded', () => {
+    if (DEFAULT_SERVICE_LANGUAGE) {
+        document.getElementById('serviceLanguage').value = DEFAULT_SERVICE_LANGUAGE;
+        loadServiceDescription();
+    }
+});
 
 const Toast = Swal.mixin({
     toast: true,
@@ -1178,9 +1318,6 @@ document.addEventListener('submit', function (event) {
         });
 });
 
-// ============================================================
-// CREAR / REGISTRAR SUBCATEGORÍAS (AJAX)
-// ============================================================
 document.addEventListener('submit', function(e) {
     if (e.target && e.target.id === 'createTariffForm') {
         e.preventDefault();

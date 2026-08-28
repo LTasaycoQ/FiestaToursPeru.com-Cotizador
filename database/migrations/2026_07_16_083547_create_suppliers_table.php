@@ -13,13 +13,11 @@ return new class extends Migration
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id('id_supplier');
 
-            // Tipo de Proveedor: Alojamiento, Operador, Transporte
             $table->foreignId('id_categories_suppliers')
                 ->nullable()
                 ->constrained('categories_suppliers', 'id_categories_suppliers')
                 ->nullOnDelete();
 
-            // Clase del Proveedor: Turista, Boutique (Aplica si es Alojamiento)
             $table->foreignId('id_supplier_subcategory')
                 ->nullable()
                 ->constrained('supplier_subcategories', 'id_supplier_subcategory')
@@ -37,7 +35,6 @@ return new class extends Migration
                 ->nullOnDelete();
 
             $table->string('address', 255)->nullable();
-            $table->text('description')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

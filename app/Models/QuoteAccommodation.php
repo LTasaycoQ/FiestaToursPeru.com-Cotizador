@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class QuoteAccommodation extends Model
 {
     protected $table = 'quote_accommodation';
+
     protected $primaryKey = 'id_quote_accommodation';
 
     protected $fillable = [
@@ -17,12 +18,17 @@ class QuoteAccommodation extends Model
         'id_service',
         'id_tariff',
         'id_supplier',
+        'room_type',
+        'room_capacity',
+        'room_count',
         'unit_price',
         'subtotal',
     ];
 
     protected $casts = [
         'option_number' => 'integer',
+        'room_capacity' => 'integer',
+        'room_count' => 'integer',
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
     ];
@@ -56,6 +62,19 @@ class QuoteAccommodation extends Model
         return $this->belongsTo(Supplier::class, 'id_supplier', 'id_supplier');
     }
 
+    /**
+     * Pasajeros asignados a esta fila de alojamiento
+     */
+    public function occupants()
+    {
+        return $this->belongsToMany(
+            QuotePassenger::class,
+            'quote_accommodation_occupant',
+            'id_quote_accommodation',
+            'id_quote_passenger'
+        )->withTimestamps();
+    }
+
     // ============================================================
     // SCOPES
     // ============================================================
@@ -74,7 +93,7 @@ class QuoteAccommodation extends Model
      */
     public function calculateSubtotal(): void
     {
-        $this->subtotal = $this->unit_price;
+        $this->subtotal = $this->unit_price * max(1, (int) ($this->room_count ?? 1));
         $this->save();
     }
 

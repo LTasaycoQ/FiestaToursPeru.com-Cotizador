@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Log;
 
 class Quote extends Model
@@ -14,12 +14,14 @@ class Quote extends Model
     use SoftDeletes;
 
     protected $table = 'quote';
+
     protected $primaryKey = 'id_quote';
 
     protected $fillable = [
         'id_client',
         'id_users',
         'id_contacts',
+        'id_labels',
         'name',
         'quote_number',
         'correlative',
@@ -66,6 +68,11 @@ class Quote extends Model
         return $this->belongsTo(Contact::class, 'id_contacts', 'id_contacts');
     }
 
+    public function market(): BelongsTo
+    {
+        return $this->belongsTo(Labels::class, 'id_labels', 'id_labels');
+    }
+
     public function quoteDays(): HasMany
     {
         return $this->hasMany(QuoteDay::class, 'id_quote', 'id_quote')->orderBy('day_number');
@@ -96,6 +103,14 @@ class Quote extends Model
     public function accommodationOption2(): HasMany
     {
         return $this->accommodations()->where('option_number', 2);
+    }
+
+    /**
+     * Pasajeros (viajeros) asignados a esta cotización
+     */
+    public function passengers(): HasMany
+    {
+        return $this->hasMany(QuotePassenger::class, 'id_quote', 'id_quote');
     }
 
     // ============================================================
@@ -156,6 +171,7 @@ class Quote extends Model
     public function hasCompleteAccommodation(int $optionNumber = 1): bool
     {
         $coverage = $this->getAccommodationCoverage($optionNumber);
+
         return $coverage['covered_days'] === $coverage['total_days'];
     }
 
@@ -203,6 +219,7 @@ class Quote extends Model
                 $unitPrice
             );
         }
+
         return $records;
     }
 
@@ -329,11 +346,12 @@ class Quote extends Model
             return false;
         }
 
-        if (!$this->start_date) {
+        if (! $this->start_date) {
             Log::warning('Intento de asignar correlativo sin start_date', [
                 'quote_id' => $this->id_quote,
-                'quote_number' => $this->quote_number
+                'quote_number' => $this->quote_number,
             ]);
+
             return false;
         }
 
@@ -346,7 +364,7 @@ class Quote extends Model
 
     public function hasCorrelative(): bool
     {
-        return !empty($this->correlative);
+        return ! empty($this->correlative);
     }
 
     public function getFormattedCorrelativeAttribute(): string

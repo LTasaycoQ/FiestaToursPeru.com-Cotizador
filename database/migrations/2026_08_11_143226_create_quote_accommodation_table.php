@@ -25,19 +25,24 @@ return new class extends Migration
 
             $table->foreignId('id_service')->constrained('service', 'id_service')
                 ->comment('Debe ser un service cuya categoría tenga is_accommodation = true');
-            $table->foreignId('id_tariff')->constrained('tariff', 'id_tariff');
+            $table->foreignId('id_tariff')->nullable()->constrained('tariff', 'id_tariff');
             $table->foreignId('id_supplier')->constrained('suppliers', 'id_supplier');
 
-            $table->decimal('unit_price', 12, 2)->default(0)->comment('Precio por noche');
-            $table->decimal('subtotal', 12, 2)->default(0)->comment('Subtotal = unit_price * 1 noche');
+            $table->string('room_type', 32)->nullable()->comment('simple, doble, triple');
+            $table->unsignedTinyInteger('room_capacity')->default(1)->comment('Capacidad de personas por habitación');
+            $table->unsignedTinyInteger('room_count')->default(1)->comment('Cantidad de habitaciones del mismo tipo');
+
+            $table->decimal('unit_price', 12, 2)->default(0)->comment('Precio por noche o por habitación');
+            $table->decimal('subtotal', 12, 2)->default(0)->comment('Subtotal calculado por room_count');
 
             $table->timestamps();
 
             $table->index(['id_quote', 'option_number']);
             $table->index('id_service');
             $table->index('id_quote_day');
+            $table->index('room_type');
 
-            $table->unique(['id_quote', 'option_number', 'id_quote_day'], 'unique_hotel_per_day_option');
+            $table->unique(['id_quote', 'option_number', 'id_quote_day', 'id_service', 'room_type'], 'unique_hotel_room_type_per_day_option');
         });
     }
 

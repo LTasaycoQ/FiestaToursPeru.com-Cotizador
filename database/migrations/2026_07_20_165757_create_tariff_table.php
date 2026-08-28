@@ -25,6 +25,8 @@ return new class extends Migration
                 ->constrained('season', 'id_season')
                 ->nullOnDelete();
 
+            $table->string('pricing_type', 100)->nullable()->comment('Tipo de tarifa: por persona, por habitación, por grupo, etc.');
+
             $table->integer('min_people_count')->nullable();
             $table->integer('max_people_count')->nullable();
 

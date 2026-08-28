@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\ServicesTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Imports\ServicesImport;
 use App\Models\Labels;
+use App\Models\Language;
 use App\Models\Service;
 use App\Models\ServiceCategory;
+use App\Models\ServiceDescription;
 use App\Models\SubCategory;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ServiceController extends Controller
 {
@@ -16,9 +22,10 @@ class ServiceController extends Controller
     {
         $search = $request->input('search');
         $category = $request->input('category');
+        $label = $request->input('label');
         $statusFilter = $request->input('status');
 
-        $services = Service::with(['category', 'labels', 'supplier'])
+        $services = Service::with(['category', 'labels', 'supplier', 'descriptions.language'])
             ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('name_service', 'like', "%{$search}%")
@@ -28,8 +35,8 @@ class ServiceController extends Controller
             ->when($category, function ($query, $category) {
                 return $query->where('id_category', $category);
             })
-            ->when($labels, function ($query, $labels) {
-                return $query->where('id_labels', $labels);
+            ->when($label, function ($query, $label) {
+                return $query->where('id_labels', $label);
             })
             ->when($statusFilter, function ($query, $statusFilter) {
                 return $query->where('status', $statusFilter);
@@ -37,11 +44,12 @@ class ServiceController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        $categories = ServiceCategory::where('status', 'active')->get();
+        $categories = ServiceCategory::where('status', 'active')->orderBy('name')->get();
+        $labels = Labels::where('status', 'active')->orderBy('name_labels')->get();
         $statuses = Service::distinct()->pluck('status')->filter()->toArray();
 
         return view('admin.services.index', compact(
-            'services', 'categories', 'statuses', 'search', 'category', 'statusFilter'
+            'services', 'categories', 'labels', 'statuses', 'search', 'category', 'label', 'statusFilter'
         ));
     }
 
@@ -51,7 +59,43 @@ class ServiceController extends Controller
         $labels = Labels::where('status', 'active')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
 
-        return view('admin.services.create', compact('categories', 'labels', 'suppliers'));
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
+
+        return view('admin.services.create', compact('categories', 'labels', 'suppliers', 'languages'));
+    }
+
+    public function importView()
+    {
+        return view('admin.services.import');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'archivo' => 'required|file|mimes:xlsx,xls|max:5120',
+        ]);
+
+        $import = new ServicesImport;
+
+        try {
+            Excel::import($import, $request->file('archivo'));
+        } catch (\Throwable $exception) {
+            return back()->withErrors([
+                'archivo' => 'Error al procesar el archivo: '.$exception->getMessage(),
+            ]);
+        }
+
+        $message = "Importación completada: {$import->imported} servicio(s) y {$import->tariffsImported} tarifa(s) registrados.";
+        if ($import->errors !== []) {
+            $message .= ' '.implode(' ', $import->errors);
+        }
+
+        return redirect()->route('admin.services.index')->with('success', $message);
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new ServicesTemplateExport, 'tarifario_general.xlsx');
     }
 
     public function store(Request $request)
@@ -64,6 +108,8 @@ class ServiceController extends Controller
             'description' => 'nullable|string|max:900',
             'availability_days' => 'nullable|string',
             'status' => 'nullable|string|max:20',
+            'descriptions' => 'nullable|array',
+            'descriptions.*' => 'nullable|string',
         ]);
 
         $defaultWeekDays = 'Lunes, Martes, Miércoles, Jueves, Viernes, Sábado, Domingo';
@@ -79,6 +125,8 @@ class ServiceController extends Controller
             'status' => $validated['status'] ?? 'active',
         ]);
 
+        $this->syncDescriptions($service, $request->input('descriptions', []));
+
         return redirect()
             ->route('admin.tariffs.index', $service->id_service)
             ->with('success', 'Servicio creado. Ahora registra sus tarifas.');
@@ -86,12 +134,14 @@ class ServiceController extends Controller
 
     public function edit($id)
     {
-        $service = Service::with(['category', 'labels', 'supplier'])->findOrFail($id);
+        $service = Service::with(['category', 'labels', 'supplier', 'descriptions'])->findOrFail($id);
         $categories = ServiceCategory::where('status', 'active')->get();
         $labels = Labels::where('status', 'active')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
 
-        return view('admin.services.edit', compact('service', 'categories', 'labels', 'suppliers'));
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
+
+        return view('admin.services.edit', compact('service', 'categories', 'labels', 'suppliers', 'languages'));
     }
 
     public function update(Request $request, $id)
@@ -101,7 +151,10 @@ class ServiceController extends Controller
         $validated = $request->validate([
             'name_service' => 'required|string|max:300',
             'id_category' => 'required|exists:service_category,id_category',
-            'id_labels' => 'nullable|exists:labels,id_labels',             'description' => 'nullable|string|max:900',
+            'id_labels' => 'nullable|exists:labels,id_labels',
+            'description' => 'nullable|string|max:900',
+            'descriptions' => 'nullable|array',
+            'descriptions.*' => 'nullable|string',
             'availability_days' => 'nullable|string|max:50',
             'status' => 'nullable|string|max:20',
         ]);
@@ -114,19 +167,81 @@ class ServiceController extends Controller
             'status' => $validated['status'] ?? $service->status,
         ]);
 
+        $this->syncDescriptions($service, $request->input('descriptions', []));
+
         return redirect()
             ->route('admin.suppliers.show', ['supplier' => $service->id_supplier, 'tab' => 'tab-services'])
             ->with('success', 'Servicio actualizado exitosamente');
+    }
+
+    private function syncDescriptions(Service $service, array $descriptions): void
+    {
+        foreach ($descriptions as $languageId => $description) {
+            if (! Language::whereKey($languageId)->exists()) {
+                continue;
+            }
+
+            ServiceDescription::updateOrCreate(
+                ['id_service' => $service->id_service, 'id_language' => $languageId],
+                ['description' => trim((string) $description)]
+            );
+        }
+    }
+
+    public function storeDescription(Request $request, Service $service)
+    {
+        $validated = $request->validate([
+            'id_language' => 'required|exists:languages,id_language',
+            'description' => 'required|string|max:5000',
+        ]);
+
+        ServiceDescription::updateOrCreate(
+            [
+                'id_service' => $service->id_service,
+                'id_language' => $validated['id_language'],
+            ],
+            ['description' => trim($validated['description'])]
+        );
+
+        return redirect()
+            ->route('admin.tariffs.index', $service->id_service)
+            ->with('success', 'Descripción guardada correctamente.');
     }
 
     public function destroy($id)
     {
         $service = Service::findOrFail($id);
         $supplierId = $service->id_supplier;
-        $service->delete();
+
+        DB::transaction(function () use ($service): void {
+            $tariffIds = $service->tariffs()->pluck('id_tariff');
+
+            DB::table('detail_quote')
+                ->where('id_service', $service->id_service)
+                ->delete();
+
+            DB::table('quote_accommodation_occupant')
+                ->whereIn(
+                    'id_quote_accommodation',
+                    DB::table('quote_accommodation')
+                        ->where('id_service', $service->id_service)
+                        ->pluck('id_quote_accommodation')
+                )
+                ->delete();
+
+            DB::table('quote_accommodation')
+                ->where('id_service', $service->id_service)
+                ->delete();
+
+            if ($tariffIds->isNotEmpty()) {
+                DB::table('tariff')->whereIn('id_tariff', $tariffIds)->delete();
+            }
+
+            $service->delete();
+        });
 
         return redirect()
-            ->route('admin.suppliers.show', ['supplier' => $supplierId, 'tab' => 'tab-services'])
+            ->route('admin.suppliers.productos', ['supplier' => $supplierId, 'tab' => 'tab-services'])
             ->with('success', 'Servicio eliminado exitosamente');
     }
 

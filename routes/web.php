@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/bulk/force', [SupplierController::class, 'bulkForceDestroy'])->name('bulk.force.destroy');
 
         Route::get('/{supplier}/productos', [SupplierController::class, 'products'])->name('productos');
+        Route::post('/{supplier}/descripciones', [SupplierController::class, 'storeDescription'])->name('descriptions.store');
     });
 
     // ============================================================
@@ -175,7 +176,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/{quote}', [QuoteController::class, 'show'])->name('show');
         Route::get('/{quote}/editar', [QuoteController::class, 'edit'])->name('edit');
+        Route::get('/{quote}/exportar/excel', [QuoteController::class, 'exportExcel'])->name('export.excel');
         Route::put('/{quote}', [QuoteController::class, 'update'])->name('update');
+        Route::post('/{quote}/cotizar', [QuoteController::class, 'quote'])->name('quote');
         Route::delete('/{quote}', [QuoteController::class, 'destroy'])->name('destroy');
 
         Route::post('/{quote}/duplicate', [QuoteController::class, 'duplicate'])->name('duplicate');
@@ -188,12 +191,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/{quote}/accommodations', [QuoteController::class, 'addAccommodation'])->name('add-accommodation');
 
         Route::post('/{quote}/accommodation-to-day', [QuoteController::class, 'addAccommodationToDay'])->name('add-accommodation-to-day');
-
         Route::delete('/{quote}/accommodations/{accommodation}', [QuoteController::class, 'removeAccommodation'])->name('remove-accommodation');
+
+        // Pasajeros y asignaciones de alojamiento
+        Route::post('/{quote}/passengers', [QuoteController::class, 'addPassenger'])->name('add-passenger');
+        Route::delete('/{quote}/passengers/{passenger}', [QuoteController::class, 'removePassenger'])->name('remove-passenger');
+
+        Route::post('/{quote}/accommodations/{accommodation}/occupants', [QuoteController::class, 'assignOccupant'])->name('assign-occupant');
+        Route::delete('/{quote}/accommodations/{accommodation}/occupants/{passenger}', [QuoteController::class, 'removeOccupant'])->name('remove-occupant');
     });
 
     Route::prefix('servicios')->name('admin.services.')->group(function () {
         Route::get('/', [ServiceController::class, 'index'])->name('index');
+        Route::get('/importar', [ServiceController::class, 'importView'])->name('import.view');
+        Route::post('/importar', [ServiceController::class, 'import'])->name('import');
+        Route::get('/plantilla', [ServiceController::class, 'downloadTemplate'])->name('template');
         Route::get('/crear', [ServiceController::class, 'create'])->name('create');
 
         Route::post('/', [ServiceController::class, 'store'])->name('store');
@@ -212,6 +224,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{service}/editar', [ServiceController::class, 'edit'])->name('edit');
         Route::put('/{service}', [ServiceController::class, 'update'])->name('update');
         Route::delete('/{service}', [ServiceController::class, 'destroy'])->name('destroy');
+        Route::post('/{service}/descripciones', [ServiceController::class, 'storeDescription'])->name('descriptions.store');
     });
 
     Route::prefix('servicios/{service}/tarifas')->name('admin.tariffs.')->group(function () {

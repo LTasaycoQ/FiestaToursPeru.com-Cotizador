@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\QuoteExport;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Contact;
@@ -10,6 +11,7 @@ use App\Models\Labels;
 use App\Models\Quote;
 use App\Models\QuoteAccommodation;
 use App\Models\QuoteDay;
+use App\Models\QuotePassenger;
 use App\Models\Season;
 use App\Models\Service;
 use App\Models\Supplier;
@@ -19,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class QuoteController extends Controller
 {
@@ -122,17 +125,10 @@ class QuoteController extends Controller
                 'id_users' => 'nullable|exists:users,id',
                 'id_client' => 'nullable|exists:clients,id_client',
                 'id_contacts' => 'nullable|exists:contacts,id_contacts',
-                'passengers_count' => 'nullable|integer|min:1',
-                'notes' => 'nullable|string',
+                'id_labels' => 'required|exists:labels,id_labels',
+                'days_count' => 'nullable|integer|min:1|max:60',
                 'date_mode' => 'nullable|in:dates,days',
             ];
-
-            if ($dateMode === 'days') {
-                $rules['days_count'] = 'required|integer|min:1|max:60';
-            } else {
-                $rules['start_date'] = 'required|date';
-                $rules['end_date'] = 'required|date|after_or_equal:start_date';
-            }
 
             $validator = Validator::make($request->all(), $rules);
 
@@ -160,12 +156,12 @@ class QuoteController extends Controller
                 'id_users' => $request->id_users ?? auth()->id(),
                 'id_client' => $request->id_client,
                 'id_contacts' => $request->id_contacts,
+                'id_labels' => $request->id_labels,
                 'status' => 'draft',
                 'days' => $dateMode === 'days' ? $request->days_count : null,
                 'start_date' => $dateMode === 'dates' ? $request->start_date : null,
                 'end_date' => $dateMode === 'dates' ? $request->end_date : null,
-                'passengers_count' => $request->passengers_count,
-                'notes' => $request->notes,
+                'passengers_count' => null,
                 'subtotal' => 0,
                 'total' => 0,
             ]);
@@ -188,13 +184,13 @@ class QuoteController extends Controller
             }
 
             $quote->calculateTotals(1);
-            \Log::info('✅ Totales calculados');
+            \Log::info('Totales calculados');
 
             DB::commit();
 
             return redirect()
-                ->route('admin.quotes.show', $quote->id_quote)
-                ->with('success', '✅ Cotización creada exitosamente.');
+                ->route('admin.quotes.edit', $quote->id_quote)
+                ->with('success', '✅ Cotización creada. Ahora puedes registrar sus servicios.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -262,6 +258,10 @@ class QuoteController extends Controller
             },
         ])
             ->where('status', 'active')
+            ->whereHas('category', function ($query) {
+                $query->where('pricing_type', 'tiered')
+                    ->where('is_accommodation', false);
+            })
             ->get();
 
         $accommodationServices = $this->accommodationServicesQuery(
@@ -281,6 +281,7 @@ class QuoteController extends Controller
             'quoteDays.details.tariff.subCategory',
             'accommodations.service',
             'accommodations.quoteDay',
+            'market',
         ]);
 
         return view('admin.quote.edit', compact(
@@ -293,6 +294,11 @@ class QuoteController extends Controller
             'labels',
             'suppliers'
         ));
+    }
+
+    public function exportExcel(Quote $quote)
+    {
+        return Excel::download(new QuoteExport($quote->id_quote), 'cotizacion-'.$quote->id_quote.'.xlsx');
     }
 
     public function update(Request $request, Quote $quote)
@@ -319,6 +325,7 @@ class QuoteController extends Controller
 
             $oldStatus = $quote->status;
             $newStatus = $request->status ?? $quote->status;
+            $oldPassengersCount = (int) ($quote->passengers_count ?: 1);
             $datesChanged = $request->start_date !== $quote->start_date?->format('Y-m-d')
                 || $request->end_date !== $quote->end_date?->format('Y-m-d');
 
@@ -334,6 +341,44 @@ class QuoteController extends Controller
                 'passengers_count' => $request->passengers_count,
                 'notes' => $request->notes,
             ]);
+
+            $passengersCount = (int) ($request->passengers_count ?: 1);
+            if ($oldPassengersCount !== $passengersCount) {
+                $details = DetailQuote::whereHas('quoteDay', function ($query) use ($quote) {
+                    $query->where('id_quote', $quote->id_quote);
+                })->with('tariff')->get();
+
+                foreach ($details as $detail) {
+                    $tariff = $detail->tariff;
+                    $selectedTariff = $tariff;
+
+                    if ($tariff && $tariff->pricing_type !== 'flat') {
+                        $selectedTariff = Tariff::where('id_service', $detail->id_service)
+                            ->where('id_subcategories', $tariff->id_subcategories)
+                            ->whereNull('id_season')
+                            ->where('status', 'active')
+                            ->where(function ($query) use ($passengersCount) {
+                                $query->whereNull('min_people_count')
+                                    ->orWhere('min_people_count', '<=', $passengersCount);
+                            })
+                            ->where(function ($query) use ($passengersCount) {
+                                $query->whereNull('max_people_count')
+                                    ->orWhere('max_people_count', '>=', $passengersCount);
+                            })
+                            ->orderByDesc('price')
+                            ->first();
+                    }
+
+                    if ($selectedTariff) {
+                        $detail->id_tariff = $selectedTariff->id_tariff;
+                        $detail->unit_price = (float) $selectedTariff->price;
+                    }
+
+                    $detail->quantity = $passengersCount;
+                    $detail->subtotal = (float) $detail->unit_price * $passengersCount;
+                    $detail->save();
+                }
+            }
 
             if ($datesChanged && $request->start_date && $request->end_date) {
                 $quote->generateItineraryDays();
@@ -377,6 +422,66 @@ class QuoteController extends Controller
         }
     }
 
+    public function quote(Request $request, Quote $quote)
+    {
+        $data = $request->validate([
+            'passengers_count' => 'required|integer|min:1',
+            'pricing_type' => 'required|in:economico,vip,privado',
+        ]);
+
+        DB::transaction(function () use ($quote, $data): void {
+            $passengersCount = (int) $data['passengers_count'];
+            $subcategoryPattern = match ($data['pricing_type']) {
+                'economico' => '%econom%',
+                'vip' => '%vip%',
+                'privado' => '%priv%',
+            };
+
+            foreach ($quote->details()->with('tariff')->get() as $detail) {
+                $tariffQuery = Tariff::where('id_service', $detail->id_service)
+                    ->where('status', 'active')
+                    ->whereHas('subCategory', fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', [$subcategoryPattern]));
+
+                $tariff = (clone $tariffQuery)
+                    ->where(function ($query) use ($passengersCount) {
+                        $query->whereNull('min_people_count')->orWhere('min_people_count', '<=', $passengersCount);
+                    })
+                    ->where(function ($query) use ($passengersCount) {
+                        $query->whereNull('max_people_count')->orWhere('max_people_count', '>=', $passengersCount);
+                    })
+                    ->orderByDesc('price')
+                    ->first();
+
+                // Keep the selected service type even when its passenger range is missing.
+                $selectedTariff = $tariff ?: $tariffQuery
+                    ->orderBy('min_people_count')
+                    ->orderByDesc('price')
+                    ->first();
+
+                $detailData = [
+                    'quantity' => $passengersCount,
+                    'subtotal' => (float) $detail->unit_price * $passengersCount,
+                ];
+
+                if ($selectedTariff) {
+                    $detailData['id_tariff'] = $selectedTariff->id_tariff;
+                }
+
+                if ($tariff) {
+                    $detailData['unit_price'] = (float) $tariff->price;
+                    $detailData['subtotal'] = (float) $tariff->price * $passengersCount;
+                }
+
+                $detail->update($detailData);
+            }
+
+            $quote->update(['passengers_count' => $passengersCount]);
+            $quote->calculateTotals(1);
+        });
+
+        return redirect()->route('admin.quotes.edit', $quote)->with('success', 'Cotización calculada correctamente.');
+    }
+
     public function destroy(Quote $quote)
     {
         try {
@@ -412,20 +517,25 @@ class QuoteController extends Controller
     {
         $terms = ['hotel', 'hospedaje', 'hospedaje', 'room', 'habitacion', 'habitación', 'alojamiento', 'lodging', 'resort', 'hostel', 'suite'];
 
-        return $query->where('status', 'active')->where(function ($query) use ($terms) {
-            $query->whereHas('category', function ($subQuery) use ($terms) {
-                $subQuery->where('is_accommodation', true)
-                    ->orWhere(function ($nameQuery) use ($terms) {
-                        foreach ($terms as $term) {
-                            $nameQuery->orWhereRaw('LOWER(name) LIKE ?', ['%'.$term.'%']);
-                        }
-                    });
-            })->orWhere(function ($fallback) use ($terms) {
-                foreach ($terms as $term) {
-                    $fallback->orWhereRaw('LOWER(name_service) LIKE ?', ['%'.$term.'%']);
-                }
+        return $query->where('status', 'active')
+            ->where(function ($pricingQuery) {
+                $pricingQuery->where('pricing_type', 'flat')
+                    ->orWhereHas('category', fn ($categoryQuery) => $categoryQuery->where('pricing_type', 'flat'));
+            })
+            ->where(function ($query) use ($terms) {
+                $query->whereHas('category', function ($subQuery) use ($terms) {
+                    $subQuery->where('is_accommodation', true)
+                        ->orWhere(function ($nameQuery) use ($terms) {
+                            foreach ($terms as $term) {
+                                $nameQuery->orWhereRaw('LOWER(name) LIKE ?', ['%'.$term.'%']);
+                            }
+                        });
+                })->orWhere(function ($fallback) use ($terms) {
+                    foreach ($terms as $term) {
+                        $fallback->orWhereRaw('LOWER(name_service) LIKE ?', ['%'.$term.'%']);
+                    }
+                });
             });
-        });
     }
 
     private function isAccommodationService(Service $service): bool
@@ -434,17 +544,131 @@ class QuoteController extends Controller
             return true;
         }
 
+        $categoryIsAccommodation = (bool) ($service->category?->is_accommodation ?? false);
+        if ($categoryIsAccommodation) {
+            return true;
+        }
+
         $keywords = ['hotel', 'hospedaje', 'room', 'habitacion', 'habitación', 'alojamiento', 'lodging', 'resort', 'hostel', 'suite'];
         $serviceName = strtolower((string) $service->name_service);
         $categoryName = strtolower((string) ($service->category?->name ?? ''));
+        $supplierName = strtolower((string) ($service->supplier?->supplier_name ?? ''));
 
         foreach ($keywords as $keyword) {
-            if (str_contains($serviceName, $keyword) || str_contains($categoryName, $keyword)) {
+            if (str_contains($serviceName, $keyword) || str_contains($categoryName, $keyword) || str_contains($supplierName, $keyword)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function normalizeRoomType(?string $roomType): string
+    {
+        $normalized = strtolower((string) ($roomType ?? 'simple'));
+
+        $map = [
+            'single' => 'simple',
+            'simple' => 'simple',
+            'spl' => 'simple',
+            'double' => 'doble',
+            'doble' => 'doble',
+            'dbl' => 'doble',
+            'matrimonial' => 'doble',
+            'queen' => 'doble',
+            'king' => 'doble',
+            'triple' => 'triple',
+            'tpl' => 'triple',
+        ];
+
+        if (isset($map[$normalized])) {
+            return $map[$normalized];
+        }
+
+        if (str_contains($normalized, 'tpl') || str_contains($normalized, 'triple')) {
+            return 'triple';
+        }
+
+        if (str_contains($normalized, 'dbl') || str_contains($normalized, 'double') || str_contains($normalized, 'doble')) {
+            return 'doble';
+        }
+
+        if (str_contains($normalized, 'spl') || str_contains($normalized, 'single') || str_contains($normalized, 'simple')) {
+            return 'simple';
+        }
+
+        return 'simple';
+    }
+
+    private function getRoomCapacity(string $roomType): int
+    {
+        $map = [
+            'simple' => 1,
+            'doble' => 2,
+            'triple' => 3,
+        ];
+
+        return $map[$roomType] ?? 1;
+    }
+
+    /**
+     * Calcula la asignación de habitaciones (cantidad por capacidad) para un número dado de pasajeros
+     * usando programación dinámica para minimizar el número de habitaciones.
+     *
+     * @param  array  $availableCapacities  Array de capacidades disponibles (ej. [3,2,1])
+     * @return array Mapa capacity => rooms_count
+     */
+    private function computeRoomAllocation(int $passengers, array $availableCapacities): array
+    {
+        $passengers = max(1, $passengers);
+        $capacities = array_values(array_unique(array_map('intval', $availableCapacities)));
+        sort($capacities);
+
+        // Programación dinámica para minimizar número de habitaciones (moneda = capacidad, minimizar monedas)
+        $INF = 1_000_000;
+        $dp = array_fill(0, $passengers + 1, $INF);
+        $last = array_fill(0, $passengers + 1, -1);
+        $dp[0] = 0;
+
+        for ($i = 1; $i <= $passengers; $i++) {
+            foreach ($capacities as $c) {
+                if ($i - $c >= 0 && $dp[$i] > $dp[$i - $c] + 1) {
+                    $dp[$i] = $dp[$i - $c] + 1;
+                    $last[$i] = $c;
+                }
+            }
+        }
+
+        if ($dp[$passengers] >= $INF) {
+            // Fallback: greedy highest-capacity first
+            rsort($capacities);
+            $remain = $passengers;
+            $result = [];
+            foreach ($capacities as $c) {
+                $count = intdiv($remain, $c);
+                if ($count > 0) {
+                    $result[$c] = $count;
+                }
+                $remain = $remain % $c;
+            }
+            if ($remain > 0) {
+                $smallest = min($capacities);
+                $result[$smallest] = ($result[$smallest] ?? 0) + 1;
+            }
+
+            return $result;
+        }
+
+        // Reconstruir solución
+        $i = $passengers;
+        $counts = [];
+        while ($i > 0 && $last[$i] > 0) {
+            $c = $last[$i];
+            $counts[$c] = ($counts[$c] ?? 0) + 1;
+            $i -= $c;
+        }
+
+        return $counts;
     }
 
     private function getTariffForService(Service $service, int $passengersCount, ?Quote $quote = null): ?Tariff
@@ -709,6 +933,13 @@ class QuoteController extends Controller
                 ], 422);
             }
 
+            if ((int) $service->id_labels !== (int) $quote->id_labels) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El servicio no pertenece al mercado seleccionado para esta cotización.',
+                ], 422);
+            }
+
             $tariff = $request->filled('id_tariff')
                 ? Tariff::where('id_service', $service->id_service)
                     ->whereNull('id_season')
@@ -723,17 +954,21 @@ class QuoteController extends Controller
                 ], 422);
             }
 
-            $quantity = $request->integer('quantity', $quote->passengers_count ?: 1);
+            $quantity = (int) ($quote->passengers_count ?: 1);
             $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
-            $detail = DetailQuote::create([
-                'id_quote_day' => $day->id_quote_day,
-                'id_service' => $service->id_service,
-                'id_tariff' => $tariff->id_tariff,
-                'id_supplier' => $service->id_supplier,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'subtotal' => $unitPrice * $quantity,
-            ]);
+            $detail = DetailQuote::firstOrCreate(
+                [
+                    'id_quote_day' => $day->id_quote_day,
+                    'id_service' => $service->id_service,
+                ],
+                [
+                    'id_tariff' => $tariff->id_tariff,
+                    'id_supplier' => $service->id_supplier,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $unitPrice * $quantity,
+                ]
+            );
 
             $quote->calculateTotals(1);
 
@@ -785,8 +1020,10 @@ class QuoteController extends Controller
         $data = $request->validate([
             'id_tariff' => 'nullable|exists:tariff,id_tariff',
             'unit_price' => 'nullable|numeric|min:0',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'nullable|integer|min:1',
         ]);
+
+        $quantity = (int) ($quote->passengers_count ?: 1);
 
         // If id_tariff provided, use it; otherwise try to resolve a tariff automatically
         if (! empty($data['id_tariff'])) {
@@ -796,18 +1033,18 @@ class QuoteController extends Controller
                 ->where('status', 'active')
                 ->firstOrFail();
 
-            $unitPrice = $this->resolveTariffPrice($tariff, $data['quantity']);
+            $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
 
             $detail->update([
                 'id_tariff' => $tariff->id_tariff,
                 'unit_price' => $unitPrice,
-                'quantity' => $data['quantity'],
-                'subtotal' => $unitPrice * $data['quantity'],
+                'quantity' => $quantity,
+                'subtotal' => $unitPrice * $quantity,
             ]);
         } else {
             // No tariff selected: try to find an appropriate tariff for this service
             $service = Service::find($detail->id_service);
-            $tariff = $this->getTariffForService($service, $data['quantity'], $quote);
+            $tariff = $this->getTariffForService($service, $quantity, $quote);
 
             if (! $tariff) {
                 return response()->json([
@@ -816,13 +1053,13 @@ class QuoteController extends Controller
                 ], 422);
             }
 
-            $unitPrice = $this->resolveTariffPrice($tariff, $data['quantity']);
+            $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
 
             $detail->update([
                 'id_tariff' => $tariff->id_tariff,
                 'unit_price' => $unitPrice,
-                'quantity' => $data['quantity'],
-                'subtotal' => $unitPrice * $data['quantity'],
+                'quantity' => $quantity,
+                'subtotal' => $unitPrice * $quantity,
             ]);
         }
 
@@ -899,16 +1136,23 @@ class QuoteController extends Controller
     public function addAccommodationToDay(Request $request, Quote $quote)
     {
         $data = $request->validate([
-            'option_number' => 'required|integer|in:1,2',
+            'option_number' => 'required|integer|min:1',
             'day_number' => 'nullable|integer|min:1',
             'day_start' => 'nullable|integer|min:1',
             'day_end' => 'nullable|integer|min:1|gte:day_start',
             'id_service' => 'required|exists:service,id_service',
             'id_tariff' => 'nullable|exists:tariff,id_tariff',
+            'room_type' => 'nullable|string|in:simple,doble,triple,matrimonial,queen,king,single,double',
+            'room_count' => 'nullable|integer|min:1',
+            'room_allocations' => 'nullable|array',
+            'room_allocations.*.*' => 'nullable|integer|min:0',
         ]);
 
         $startDay = (int) ($request->input('day_start', $request->input('day_number', 1)));
         $endDay = (int) ($request->input('day_end', $request->input('day_number', $startDay)));
+        $roomType = $this->normalizeRoomType($request->input('room_type', 'simple'));
+        $roomCount = max(1, (int) ($request->input('room_count', $request->input('room_quantity', 1))));
+        $roomCapacity = $this->getRoomCapacity($roomType);
 
         if ($endDay < $startDay) {
             return response()->json([
@@ -918,50 +1162,313 @@ class QuoteController extends Controller
         }
 
         $service = Service::with('category')->where('status', 'active')->find($data['id_service']);
-        if (! $service || ! $this->isAccommodationService($service)) {
+        if (! $service || $service->pricing_type !== 'flat' || ! $this->isAccommodationService($service)) {
             return response()->json([
                 'success' => false,
                 'message' => 'El hotel seleccionado no está disponible.',
             ], 422);
         }
 
+        $submittedAllocations = $request->input('room_allocations', []);
+        $allDayAllocations = collect($submittedAllocations['all'] ?? [])
+            ->map(fn ($count) => (int) $count)
+            ->filter(fn ($count) => $count > 0);
+        $dayAllocations = collect($submittedAllocations)
+            ->except('all')
+            ->map(fn ($allocations) => collect($allocations)
+                ->map(fn ($count) => (int) $count));
+        $hasRoomAllocations = $allDayAllocations->isNotEmpty()
+            || $dayAllocations->contains(fn ($allocations) => $allocations->contains(fn ($count) => $count > 0));
+
+        if ($hasRoomAllocations) {
+            $tariffIds = $allDayAllocations->keys()
+                ->merge($dayAllocations->flatMap(fn ($allocations) => $allocations->keys()))
+                ->unique()
+                ->values();
+            $tariffs = Tariff::with('subCategory')
+                ->where('id_service', $service->id_service)
+                ->where('status', 'active')
+                ->whereNull('id_season')
+                ->whereIn('id_tariff', $tariffIds)
+                ->get()
+                ->keyBy('id_tariff');
+
+            if ($tariffs->count() !== $tariffIds->count()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Una o más tarifas no pertenecen al hotel seleccionado.',
+                ], 422);
+            }
+
+            $daysAssigned = 0;
+            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+
+                if (! $day) {
+                    continue;
+                }
+
+                QuoteAccommodation::where('id_quote', $quote->id_quote)
+                    ->where('option_number', $data['option_number'])
+                    ->where('id_quote_day', $day->id_quote_day)
+                    ->where('id_service', $service->id_service)
+                    ->delete();
+
+                $roomAllocations = $allDayAllocations->toArray();
+                foreach ($dayAllocations->get((string) $dayNumber, collect()) as $tariffId => $count) {
+                    $roomAllocations[$tariffId] = $count;
+                }
+                $roomAllocations = collect($roomAllocations)->filter(fn ($count) => $count > 0);
+
+                foreach ($roomAllocations as $tariffId => $roomCount) {
+                    $selectedTariff = $tariffs->get($tariffId);
+                    $roomType = $this->normalizeRoomType($selectedTariff->subCategory?->name);
+                    $unitPrice = (float) $selectedTariff->price;
+
+                    QuoteAccommodation::create([
+                        'id_quote' => $quote->id_quote,
+                        'option_number' => $data['option_number'],
+                        'id_quote_day' => $day->id_quote_day,
+                        'id_service' => $service->id_service,
+                        'id_tariff' => $selectedTariff->id_tariff,
+                        'id_supplier' => $service->id_supplier,
+                        'room_type' => $roomType,
+                        'room_capacity' => $this->getRoomCapacity($roomType),
+                        'room_count' => $roomCount,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $unitPrice * $roomCount,
+                    ]);
+                }
+
+                $daysAssigned++;
+            }
+
+            $quote->calculateTotals(1);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Habitaciones guardadas para todos los días del rango.',
+                'days_assigned' => $daysAssigned,
+            ]);
+        }
+
+        if (! $request->filled('id_accommodation')) {
+            // Register the hotel without room quantities; rooms can be defined later.
+            $daysAssigned = 0;
+            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+
+                if (! $day) {
+                    continue;
+                }
+
+                QuoteAccommodation::where('id_quote', $quote->id_quote)
+                    ->where('option_number', $data['option_number'])
+                    ->where('id_quote_day', $day->id_quote_day)
+                    ->where('id_service', $service->id_service)
+                    ->delete();
+
+                QuoteAccommodation::create([
+                    'id_quote' => $quote->id_quote,
+                    'option_number' => $data['option_number'],
+                    'id_quote_day' => $day->id_quote_day,
+                    'id_service' => $service->id_service,
+                    'id_tariff' => null,
+                    'id_supplier' => $service->id_supplier,
+                    'room_type' => null,
+                    'room_capacity' => 1,
+                    'room_count' => 0,
+                    'unit_price' => 0,
+                    'subtotal' => 0,
+                ]);
+
+                $daysAssigned++;
+            }
+
+            if ($daysAssigned === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontró un día válido del itinerario para registrar el hotel.',
+                ], 422);
+            }
+
+            $quote->calculateTotals(1);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Hotel registrado correctamente. Las habitaciones pueden definirse después.',
+                'days_assigned' => $daysAssigned,
+            ]);
+        }
+
+        // If editing a single existing accommodation record, handle update directly
+        if ($request->filled('id_accommodation')) {
+            $accId = $request->input('id_accommodation');
+            $acc = QuoteAccommodation::where('id_quote_accommodation', $accId)->where('id_quote', $quote->id_quote)->first();
+
+            if (! $acc) {
+                return response()->json(['success' => false, 'message' => 'Alojamiento no encontrado para edición.'], 404);
+            }
+
+            $roomType = $this->normalizeRoomType($request->input('room_type', $acc->room_type ?? 'simple'));
+            $roomCount = max(1, (int) ($request->input('room_count', $acc->room_count ?? 1)));
+
+            $tariff = null;
+            if ($request->filled('id_tariff')) {
+                $tariff = Tariff::where('id_tariff', $request->input('id_tariff'))
+                    ->where('id_service', $acc->id_service)
+                    ->where('status', 'active')
+                    ->first();
+            }
+
+            if ($tariff) {
+                $acc->id_tariff = $tariff->id_tariff;
+                $acc->unit_price = (float) $tariff->price;
+            }
+
+            $acc->room_type = $roomType;
+            $acc->room_capacity = $this->getRoomCapacity($roomType);
+            $acc->room_count = $roomCount;
+            $acc->subtotal = ($acc->unit_price ?? 0) * $roomCount;
+            $acc->save();
+
+            $quote->calculateTotals(1);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Alojamiento actualizado correctamente.',
+                'accommodation_id' => $acc->id_quote_accommodation,
+            ]);
+        }
+
         $tariff = ! empty($data['id_tariff'])
             ? Tariff::where('id_service', $service->id_service)
                 ->where('status', 'active')
                 ->find($data['id_tariff'])
-            : $this->getTariffForService($service, $quote->passengers_count ?: 1, $quote);
+            : null;
 
-        if (! $tariff) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No hay una tarifa activa disponible para este hotel.',
-            ], 422);
-        }
+        $unitPrice = $tariff ? (float) $tariff->price : 0.0;
 
         $daysAssigned = [];
-        for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
-            $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
 
-            if (! $day) {
-                continue;
+        // Determinar si se debe auto distribuir pasajeros en habitaciones
+        $autoAllocate = false;
+
+        if ($autoAllocate) {
+            // Obtener tarifas por subcategoría para este servicio y mapear por capacidad
+            $serviceTariffs = Tariff::with('subCategory')
+                ->where('id_service', $service->id_service)
+                ->where('status', 'active')
+                ->get();
+
+            $capacityToTariff = [];
+            foreach ($serviceTariffs as $t) {
+                $scLabel = $t->subCategory?->code ?? $t->subCategory?->name ?? '';
+                $rt = $this->normalizeRoomType($scLabel);
+                $cap = $this->getRoomCapacity($rt);
+
+                // Guardar la tarifa más barata por capacidad disponible
+                if (! isset($capacityToTariff[$cap]) || ($t->price < $capacityToTariff[$cap]->price)) {
+                    $capacityToTariff[$cap] = $t;
+                }
             }
 
-            $accommodation = QuoteAccommodation::updateOrCreate(
-                [
-                    'id_quote' => $quote->id_quote,
-                    'option_number' => $data['option_number'],
-                    'id_quote_day' => $day->id_quote_day,
-                ],
-                [
-                    'id_service' => $service->id_service,
-                    'id_tariff' => $tariff->id_tariff,
-                    'id_supplier' => $service->id_supplier,
-                    'unit_price' => $tariff->price,
-                    'subtotal' => $tariff->price,
-                ]
-            );
+            if (empty($capacityToTariff)) {
+                // No hay subcategorías en las tarifas: crear la fila única como antes
+                for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                    $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+                    if (! $day) {
+                        continue;
+                    }
 
-            $daysAssigned[] = $accommodation->id_quote_accommodation;
+                    $accommodation = QuoteAccommodation::updateOrCreate(
+                        [
+                            'id_quote' => $quote->id_quote,
+                            'option_number' => $data['option_number'],
+                            'id_quote_day' => $day->id_quote_day,
+                            'id_service' => $service->id_service,
+                            'room_type' => $roomType,
+                        ],
+                        [
+                            'id_tariff' => $tariff?->id_tariff,
+                            'id_supplier' => $service->id_supplier,
+                            'room_capacity' => $roomCapacity,
+                            'room_count' => $roomCount,
+                            'unit_price' => $unitPrice,
+                            'subtotal' => $unitPrice * $roomCount,
+                        ]
+                    );
+
+                    $daysAssigned[] = $accommodation->id_quote_accommodation;
+                }
+            } else {
+                // Calcular asignación de habitaciones para el total de pasajeros
+                $capacities = array_keys($capacityToTariff);
+                $alloc = $this->computeRoomAllocation($passengersCount, $capacities); // mapa capacity => rooms
+
+                for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                    $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+                    if (! $day) {
+                        continue;
+                    }
+
+                    // Para cada capacidad, crear/actualizar una fila de alojamiento (por tipo)
+                    foreach ($alloc as $cap => $roomsCount) {
+                        $roomTypeForCap = $cap === 3 ? 'triple' : ($cap === 2 ? 'doble' : 'simple');
+                        $tariffForCap = $capacityToTariff[$cap];
+                        $unitPriceForCap = (float) $tariffForCap->price;
+
+                        $accommodation = QuoteAccommodation::updateOrCreate(
+                            [
+                                'id_quote' => $quote->id_quote,
+                                'option_number' => $data['option_number'],
+                                'id_quote_day' => $day->id_quote_day,
+                                'id_service' => $service->id_service,
+                                'room_type' => $roomTypeForCap,
+                            ],
+                            [
+                                'id_tariff' => $tariffForCap?->id_tariff,
+                                'id_supplier' => $service->id_supplier,
+                                'room_capacity' => $cap,
+                                'room_count' => $roomsCount,
+                                'unit_price' => $unitPriceForCap,
+                                'subtotal' => $unitPriceForCap * $roomsCount,
+                            ]
+                        );
+
+                        $daysAssigned[] = $accommodation->id_quote_accommodation;
+                    }
+                }
+            }
+        } else {
+            // Comportamiento tradicional: crear una sola fila de alojamiento según roomType/roomCount
+            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
+
+                if (! $day) {
+                    continue;
+                }
+
+                $accommodation = QuoteAccommodation::updateOrCreate(
+                    [
+                        'id_quote' => $quote->id_quote,
+                        'option_number' => $data['option_number'],
+                        'id_quote_day' => $day->id_quote_day,
+                        'id_service' => $service->id_service,
+                        'room_type' => $roomType,
+                    ],
+                    [
+                        'id_tariff' => $tariff?->id_tariff,
+                        'id_supplier' => $service->id_supplier,
+                        'room_capacity' => $roomCapacity,
+                        'room_count' => $roomCount,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $unitPrice * $roomCount,
+                    ]
+                );
+
+                $daysAssigned[] = $accommodation->id_quote_accommodation;
+            }
         }
 
         if (empty($daysAssigned)) {
@@ -977,6 +1484,9 @@ class QuoteController extends Controller
             'success' => true,
             'message' => 'Hotel guardado correctamente.',
             'days_assigned' => count($daysAssigned),
+            'room_type' => $roomType,
+            'room_count' => $roomCount,
+            'room_capacity' => $roomCapacity,
         ]);
     }
 
@@ -996,5 +1506,122 @@ class QuoteController extends Controller
             'success' => true,
             'message' => 'Hotel eliminado correctamente.',
         ]);
+    }
+
+    /**
+     * Agregar un pasajero a la cotización
+     */
+    public function addPassenger(Request $request, Quote $quote)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:200',
+            'document' => 'nullable|string|max:100',
+        ]);
+
+        $passenger = QuotePassenger::create([
+            'id_quote' => $quote->id_quote,
+            'name' => $data['name'],
+            'document' => $data['document'] ?? null,
+        ]);
+
+        // opcional: actualizar passengers_count si está vacío
+        if (! $quote->passengers_count) {
+            $quote->passengers_count = $quote->passengers()->count();
+            $quote->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pasajero agregado.',
+            'passenger' => $passenger,
+        ]);
+    }
+
+    public function removePassenger(Quote $quote, $passengerId)
+    {
+        $passenger = QuotePassenger::where('id_quote_passenger', $passengerId)
+            ->where('id_quote', $quote->id_quote)
+            ->first();
+
+        if (! $passenger) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pasajero no encontrado en esta cotización.',
+            ], 404);
+        }
+
+        // detach from accommodations
+        $passenger->accommodations()->detach();
+        $passenger->delete();
+
+        // actualizar passengers_count
+        $quote->passengers_count = $quote->passengers()->count();
+        $quote->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pasajero eliminado.',
+        ]);
+    }
+
+    /**
+     * Asignar un pasajero a una fila de alojamiento (ocupante)
+     */
+    public function assignOccupant(Request $request, Quote $quote, QuoteAccommodation $accommodation)
+    {
+        $data = $request->validate([
+            'id_quote_passenger' => 'required|integer',
+        ]);
+
+        if ($accommodation->id_quote !== $quote->id_quote) {
+            return response()->json(['success' => false, 'message' => 'El alojamiento no pertenece a esta cotización.'], 404);
+        }
+
+        $passenger = QuotePassenger::where('id_quote_passenger', $data['id_quote_passenger'])
+            ->where('id_quote', $quote->id_quote)
+            ->first();
+
+        if (! $passenger) {
+            return response()->json(['success' => false, 'message' => 'Pasajero no encontrado.'], 404);
+        }
+
+        $maxOccupants = max(1, ($accommodation->room_capacity ?? 1) * ($accommodation->room_count ?? 1));
+        $current = \DB::table('quote_accommodation_occupant')
+            ->where('id_quote_accommodation', $accommodation->id_quote_accommodation)
+            ->count();
+
+        if ($current >= $maxOccupants) {
+            return response()->json(['success' => false, 'message' => 'Capacidad máxima alcanzada para esta habitación.'], 422);
+        }
+
+        // attach (ignore if exists)
+        try {
+            \DB::table('quote_accommodation_occupant')->insertOrIgnore([
+                'id_quote_accommodation' => $accommodation->id_quote_accommodation,
+                'id_quote_passenger' => $passenger->id_quote_passenger,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Pasajero asignado a la habitación.']);
+        } catch (\Throwable $e) {
+            \Log::error('Error al asignar ocupante: '.$e->getMessage());
+
+            return response()->json(['success' => false, 'message' => 'No se pudo asignar el pasajero.'], 500);
+        }
+    }
+
+    public function removeOccupant(Quote $quote, QuoteAccommodation $accommodation, $passengerId)
+    {
+        if ($accommodation->id_quote !== $quote->id_quote) {
+            return response()->json(['success' => false, 'message' => 'El alojamiento no pertenece a esta cotización.'], 404);
+        }
+
+        \DB::table('quote_accommodation_occupant')
+            ->where('id_quote_accommodation', $accommodation->id_quote_accommodation)
+            ->where('id_quote_passenger', $passengerId)
+            ->delete();
+
+        return response()->json(['success' => true, 'message' => 'Pasajero removido de la habitación.']);
     }
 }

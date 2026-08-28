@@ -12,10 +12,12 @@ use App\Models\Chain;
 use App\Models\Contact;
 use App\Models\Country;
 use App\Models\Labels;
+use App\Models\Language;
 use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\SubCategory;
 use App\Models\Supplier;
+use App\Models\SupplierDescription;
 use App\Models\SupplierImage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -345,8 +347,7 @@ class SupplierController extends Controller
         $categories = CategorySupplier::orderBy('category_name')->get();
         $banks = Bank::orderBy('bank_name')->get();
         $chains = Chain::orderBy('name')->get();
-
-        $supplier->load(['bankAccounts.bank', 'city.country', 'chains', 'images']);
+        $supplier->load(['bankAccounts.bank', 'city.country', 'chains', 'images', 'descriptions.language']);
 
         return view('admin.suppliers.edit', compact('supplier', 'categories', 'banks', 'chains'));
     }
@@ -555,6 +556,26 @@ class SupplierController extends Controller
             return back()->with('error', 'Error al actualizar el proveedor: '.$e->getMessage())
                 ->withInput();
         }
+    }
+
+    public function storeDescription(Request $request, Supplier $supplier)
+    {
+        $validated = $request->validate([
+            'id_language' => 'required|exists:languages,id_language',
+            'description' => 'required|string|max:5000',
+        ]);
+
+        SupplierDescription::updateOrCreate(
+            [
+                'id_supplier' => $supplier->id_supplier,
+                'id_language' => $validated['id_language'],
+            ],
+            ['description' => trim($validated['description'])]
+        );
+
+        return redirect()
+            ->route('admin.suppliers.productos', ['supplier' => $supplier->id_supplier, 'tab' => 'tab-info'])
+            ->with('success', 'Descripción guardada correctamente.');
     }
 
     public function destroy(Supplier $supplier)
@@ -1055,7 +1076,7 @@ class SupplierController extends Controller
             ->filter()
             ->toArray();
 
-        $services = Service::with(['category', 'labels'])
+        $services = Service::with(['category', 'labels', 'descriptions.language'])
             ->where('id_supplier', $supplier->id_supplier)
             ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
@@ -1091,9 +1112,10 @@ class SupplierController extends Controller
             ->withQueryString()
             ->appends(['tab' => 'tab-services']);
 
-        $supplier->load(['category', 'city', 'country', 'chains']);
+        $supplier->load(['category', 'city', 'country', 'chains', 'descriptions.language']);
 
         $banks = Bank::orderBy('bank_name')->get();
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
         $labels = Labels::where('status', 'active')->get();
 
         return view('admin.suppliers.products', compact(
@@ -1106,6 +1128,7 @@ class SupplierController extends Controller
             'categories',
             'statuses',
             'banks',
+            'languages',
             'labels'
         ));
     }

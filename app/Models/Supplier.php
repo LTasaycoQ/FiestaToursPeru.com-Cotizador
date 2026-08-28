@@ -21,7 +21,7 @@ class Supplier extends Model
 
     protected $fillable = [
         'id_categories_suppliers',
-        'id_supplier_subcategory', // 👈 AGREGADO
+        'id_supplier_subcategory',
         'supplier_name',
         'business_name',
         'tax_code',
@@ -63,6 +63,11 @@ class Supplier extends Model
     public function services(): HasMany
     {
         return $this->hasMany(Service::class, 'id_supplier', 'id_supplier');
+    }
+
+    public function descriptions(): HasMany
+    {
+        return $this->hasMany(SupplierDescription::class, 'id_supplier', 'id_supplier');
     }
 
     public function bankAccounts(): HasMany

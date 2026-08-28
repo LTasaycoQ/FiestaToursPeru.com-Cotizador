@@ -720,7 +720,7 @@
                                         <input type="checkbox" class="form-check-input quote-checkbox" name="quote_ids[]" value="{{ $quote->id_quote }}">
                                     </td>
                                     <td data-label="Nombre">
-                                        <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="quote-name-link">
+                                        <a  href="{{ route('admin.quotes.edit', $quote->id_quote) }}"  class="quote-name-link">
                                             {{ $quote->name ?? 'Cotización' }}
                                         </a>
                                     </td>

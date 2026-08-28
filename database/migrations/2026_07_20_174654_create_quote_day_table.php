@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('id_quote')->constrained('quote', 'id_quote')->cascadeOnDelete();
 
             $table->unsignedSmallInteger('day_number')->comment('1, 2, 3... relativo al itinerario');
-            $table->date('date')->comment('Fecha real: start_date + (day_number - 1)');
+            $table->date('date')->nullable()->comment('Fecha real: start_date + (day_number - 1)');
 
             $table->timestamps();
 

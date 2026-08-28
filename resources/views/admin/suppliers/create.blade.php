@@ -616,11 +616,6 @@
                     </div>
                 </div>
 
-                <div class="field-group">
-                    <label>Descripción</label>
-                    <textarea name="description" rows="3"
-                              placeholder="Describe al proveedor...">{{ old('description') }}</textarea>
-                </div>
             </div>
 
             {{-- ── CATEGORÍA ── --}}

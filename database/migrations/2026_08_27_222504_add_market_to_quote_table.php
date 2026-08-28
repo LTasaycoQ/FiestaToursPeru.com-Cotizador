@@ -6,17 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    protected $connection = 'mysql';
+
     public function up(): void
     {
-        Schema::table('quote_day', function (Blueprint $table) {
-            $table->date('date')->nullable()->change();
+        Schema::table('quote', function (Blueprint $table) {
+           
         });
     }
 
     public function down(): void
     {
-        Schema::table('quote_day', function (Blueprint $table) {
-            $table->date('date')->nullable(false)->change();
+        Schema::table('quote', function (Blueprint $table) {
+            $table->dropForeign(['id_labels']);
+            $table->dropColumn('id_labels');
         });
     }
 };

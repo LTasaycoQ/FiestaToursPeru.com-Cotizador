@@ -74,6 +74,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Tipo de mercado <span style="color:#991b1b">*</span></label>
+                        <select class="form-control" name="id_labels" required>
+                            <option value="">Seleccione un mercado</option>
+                            @foreach($labels as $label)
+                                <option value="{{ $label->id_labels }}" {{ old('id_labels') == $label->id_labels ? 'selected' : '' }}>
+                                    {{ $label->name_labels }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="hint"><i class="ti ti-tag"></i> Solo se mostrarán servicios de este mercado en el itinerario.</div>
+                    </div>
+
+                    <div class="form-group">
                         <label>Contacto</label>
                         <div style="display:flex; gap:8px; align-items:flex-end;">
                             <select class="form-control" name="id_contacts" id="id_contacts" style="flex:1;">
@@ -82,15 +95,6 @@
                             <button type="button" class="btn btn-secondary" style="padding:10px 12px; white-space:nowrap; background: #0F172A;color:white; border-color: #0F172A;" onclick="openQuoteContactModal()">
                                 <i class="ti ti-plus"></i> 
                             </button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Pasajeros</label>
-                        <input type="number" class="form-control" name="passengers_count" min="1" value="{{ old('passengers_count', 1) }}">
-                        <div class="hint">
-                            <i class="ti ti-users"></i>
-                            Número de personas para calcular tarifas.
                         </div>
                     </div>
 
@@ -137,20 +141,11 @@
                         </div>
                     </div>
 
-                    <div class="form-group" style="grid-column:span 2;">
-                        <label>Observaciones</label>
-                        <textarea class="form-control" name="notes" rows="3" placeholder="Notas adicionales sobre la cotización...">{{ old('notes') }}</textarea>
-                        <div class="hint">
-                            <i class="ti ti-info-circle" style="color:#6366f1;"></i>
-                            <strong>Importante:</strong> Los servicios se agregan después de crear la cotización.
-                            Los hoteles se asignan por <strong>día específico</strong> (opción 1 y opción 2).
-                        </div>
-                    </div>
                 </div>
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">
-                        <i class="ti ti-arrow-right"></i> Crear cotización
+                        <i class="ti ti-arrow-right"></i> Crear y registrar servicios
                     </button>
                     <a href="{{ route('admin.quotes.index') }}" class="btn btn-secondary">Cancelar</a>
                 </div>
@@ -316,31 +311,29 @@ function cargarContactos() {
         .catch(() => { contactsSelect.innerHTML = '<option value="">Error al cargar</option>'; });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Restaurar el modo previo (si hubo error de validación) o dejar 'dates' por defecto
-    var initialMode = document.getElementById('date_mode').value || 'dates';
-    setDateMode(initialMode);
+        document.addEventListener('DOMContentLoaded', function() {
+            var initialMode = document.getElementById('date_mode').value || 'dates';
+            setDateMode(initialMode);
 
-    document.getElementById('quoteNewContactForm').addEventListener('submit', saveQuoteContactModal);
+            document.getElementById('quoteNewContactForm').addEventListener('submit', saveQuoteContactModal);
 
-    // Preseleccionar contacto si hay un valor old
-    var oldContact = '{{ old('id_contacts') }}';
-    if (oldContact) {
-        var clientId = document.getElementById('id_client').value;
-        if (clientId) {
-            cargarContactos();
-            setTimeout(function() {
-                var contactsSelect = document.getElementById('id_contacts');
-                for (var i = 0; i < contactsSelect.options.length; i++) {
-                    if (contactsSelect.options[i].value == oldContact) {
-                        contactsSelect.selectedIndex = i;
-                        break;
-                    }
+            var oldContact = '{{ old('id_contacts') }}';
+            if (oldContact) {
+                var clientId = document.getElementById('id_client').value;
+                if (clientId) {
+                    cargarContactos();
+                    setTimeout(function() {
+                        var contactsSelect = document.getElementById('id_contacts');
+                        for (var i = 0; i < contactsSelect.options.length; i++) {
+                            if (contactsSelect.options[i].value == oldContact) {
+                                contactsSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }, 300);
                 }
-            }, 300);
-        }
-    }
-});
+            }
+        });
 </script>
 @endpush
 

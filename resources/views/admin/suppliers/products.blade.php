@@ -1553,16 +1553,39 @@
             </button>
         </div>
 
-        {{-- CUERPO DEL CONTENIDO --}}
-        <div class="content-body">
+        <div class="content-body" style="background-color: transparent;">
 
-            {{-- ===== TAB: INFORMACIÓN ===== --}}
+            {{-- TAB: INFORMACIÓN --}}
+
             <div id="tab-info" class="tab-panel active">
 
-                {{-- DESCRIPCIÓN --}}
-                <div class="description-box">
-                    <span class="label"><i class="ti ti-align-left"></i> Descripción</span>
-                    <div class="text">{{ $supplier->description ?? 'Sin descripción disponible' }}</div>
+                @php
+                    $descriptionByLanguage = $supplier->descriptions
+                        ->mapWithKeys(fn ($description) => [$description->id_language => $description->description])
+                        ->toArray();
+                    $defaultLanguage = $languages->firstWhere('code', 'es') ?? $languages->first();
+                @endphp
+                <div class="description-box" style="margin-top:18px;">
+                    <label for="supplierLanguage" class="label">
+                        <i class="ti ti-language"></i> Idioma
+                    </label>
+                    <form method="POST" action="{{ route('admin.suppliers.descriptions.store', $supplier->id_supplier) }}" style="margin-top:12px;">
+                        @csrf
+                        <div style="display:grid;gap:14px;">
+                            <select name="id_language" id="supplierLanguage" required style="height:42px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px;">
+                                @foreach($languages->sortBy(fn ($language) => $language->code === 'es' ? 0 : 1) as $language)
+                                    <option value="{{ $language->id_language }}">{{ $language->name }} ({{ strtoupper($language->code) }})</option>
+                                @endforeach
+                            </select>
+                            <label for="supplierDescription" class="label">
+                                <i class="ti ti-align-left"></i> Descripción
+                            </label>
+                            <textarea name="description" id="supplierDescription" rows="5" required maxlength="5000" placeholder="Escribe la descripción en el idioma seleccionado..." style="border:1px solid #dbe3ef;border-radius:8px;padding:10px;resize:vertical;"></textarea>
+                            <button type="submit" class="btn btn-edit" style="width:max-content;">
+                                <i class="ti ti-device-floppy"></i> Guardar
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
                 {{-- SUB-NAVEGACIÓN --}}
@@ -1885,6 +1908,17 @@
                                                         onmouseout="this.style.color='#0f172a'">
                                                         {{ $service->name_service }}
                                                     </div>
+                                                    @if($service->descriptions->isNotEmpty())
+                                                    <div style="font-size:11px;color:#64748b;margin-top:4px;">
+                                                        @foreach($service->descriptions as $description)
+                                                            @if($description->description)
+                                                                <span title="{{ $description->description }}">
+                                                                    {{ $description->language?->name }}: {{ \Illuminate\Support\Str::limit($description->description, 75) }}
+                                                                </span>@if(!$loop->last) <span style="margin:0 5px;">·</span> @endif
+                                                            @endif
+                                                        @endforeach
+                                                    </div>
+                                                    @endif
                                                 </div>
                                             </a>
                                         </td>
@@ -2357,8 +2391,10 @@
             <input type="hidden" name="pricing_type" id="servicePricingType" value="">
 
             <div class="form-group">
-                <label>Descripción</label>
-                <textarea name="description" id="serviceDescription" rows="3" placeholder="Descripción breve del servicio..."></textarea>
+                <label>Descripciones por idioma</label>
+                @foreach($languages ?? [] as $language)
+                    <textarea name="descriptions[{{ $language->id_language }}]" rows="2" style="margin-top:8px;" placeholder="{{ $language->name }}"></textarea>
+                @endforeach
             </div>
 
             <div class="form-actions">
@@ -2459,6 +2495,21 @@
 <script>
 const CSRF_TOKEN = '{{ csrf_token() }}';
 const LIGHTBOX_IMAGES = @json($galleryImages);
+const SUPPLIER_DESCRIPTIONS = @json($descriptionByLanguage);
+const DEFAULT_SUPPLIER_LANGUAGE = @json($defaultLanguage?->id_language);
+
+function loadSupplierDescription() {
+    const language = document.getElementById('supplierLanguage').value;
+    document.getElementById('supplierDescription').value = SUPPLIER_DESCRIPTIONS[language] || '';
+}
+
+document.getElementById('supplierLanguage')?.addEventListener('change', loadSupplierDescription);
+document.addEventListener('DOMContentLoaded', () => {
+    if (DEFAULT_SUPPLIER_LANGUAGE) {
+        document.getElementById('supplierLanguage').value = DEFAULT_SUPPLIER_LANGUAGE;
+        loadSupplierDescription();
+    }
+});
 
 // ================================================================
 // GALERÍA - LIGHTBOX
@@ -2627,9 +2678,6 @@ document.querySelectorAll('.content-nav button').forEach(btn => {
     });
 });
 
-// ================================================================
-// SUB-NAVEGACIÓN
-// ================================================================
 document.querySelectorAll('.sub-nav-tabs button').forEach(btn => {
     btn.addEventListener('click', function() {
         document.querySelectorAll('.sub-nav-tabs button').forEach(b => b.classList.remove('active'));
@@ -2639,9 +2687,6 @@ document.querySelectorAll('.sub-nav-tabs button').forEach(btn => {
     });
 });
 
-// ================================================================
-// ELIMINAR SERVICIO
-// ================================================================
 function confirmDeleteService(id, name) {
     Swal.fire({
         title: '¿Eliminar servicio?',
@@ -2667,9 +2712,6 @@ function confirmDeleteService(id, name) {
     });
 }
 
-// ================================================================
-// MODALES CREAR SERVICIO
-// ================================================================
 function openCreateServiceModal() {
     document.getElementById('createServiceModal').classList.add('show');
     document.body.style.overflow = 'hidden';

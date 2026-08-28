@@ -212,6 +212,9 @@
                         </span>
                     </div>
                     <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
+                            <i class="ti ti-file-spreadsheet"></i> Excel
+                        </a>
                         <a href="{{ route('admin.quotes.edit', $quote->id_quote) }}" class="btn btn-warning">
                             <i class="ti ti-edit"></i> Editar
                         </a>

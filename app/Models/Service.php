@@ -50,6 +50,11 @@ class Service extends Model
         return $this->hasMany(Tariff::class, 'id_service', 'id_service');
     }
 
+    public function descriptions(): HasMany
+    {
+        return $this->hasMany(ServiceDescription::class, 'id_service', 'id_service');
+    }
+
     // ============================================================
     // ACCESORS
     // ============================================================

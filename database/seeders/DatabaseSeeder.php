@@ -13,8 +13,10 @@ class DatabaseSeeder extends Seeder
             LabelsSeeder::class,
             ClientSeeder::class,
             ContactSeeder::class,
-            // CategorieSeeder::class,
-            // SubCategoriesSeeder::class,
+            SupplierCategoriesSeeder::class,
+            LanguageSeeder::class,
+            CategorieSeeder::class,
+            SubCategoriesSeeder::class,
         ]);
     }
 }

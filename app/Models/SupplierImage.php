@@ -22,13 +22,11 @@ class SupplierImage extends Model
         'is_principal' => 'boolean',
     ];
 
-    // ========== RELACIONES ==========
     public function supplier()
     {
         return $this->belongsTo(Supplier::class, 'id_supplier', 'id_supplier');
     }
 
-    // ========== ACCESORES ==========
     public function getUrlAttribute()
     {
         return asset('storage/' . $this->image_path);
@@ -39,7 +37,6 @@ class SupplierImage extends Model
         return basename($this->image_path);
     }
 
-    // ========== MUTADORES ==========
     public function setIsPrincipalAttribute($value)
     {
         // Si se marca como principal, desmarcar las demás imágenes del mismo proveedor
@@ -51,7 +48,6 @@ class SupplierImage extends Model
         $this->attributes['is_principal'] = $value;
     }
 
-    // ========== SCOPES ==========
     public function scopePrincipal($query)
     {
         return $query->where('is_principal', true);

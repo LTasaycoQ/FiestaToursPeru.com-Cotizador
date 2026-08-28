@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Language;
 use App\Models\Season;
 use App\Models\Service;
 use App\Models\SubCategory;
@@ -13,7 +14,7 @@ class TariffController extends Controller
 {
     public function index($serviceId)
     {
-        $service = Service::with(['supplier', 'category'])->findOrFail($serviceId);
+        $service = Service::with(['supplier', 'category', 'descriptions.language'])->findOrFail($serviceId);
 
         $tariffsPaginated = Tariff::with('subcategory')
             ->where('id_service', $serviceId)
@@ -34,7 +35,9 @@ class TariffController extends Controller
             ->whereNotIn('id_subcategories', $existingSubcategoryIds)
             ->get();
 
-        return view('admin.tariffs.index', compact('service', 'paginator', 'availableSubcategories'));
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
+
+        return view('admin.tariffs.index', compact('service', 'paginator', 'availableSubcategories', 'languages'));
     }
 
     public function show($serviceId)

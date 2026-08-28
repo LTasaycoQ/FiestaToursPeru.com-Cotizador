@@ -38,6 +38,7 @@ class SeasonController extends Controller
 
         $season = DB::transaction(function () use ($request, $serviceId, $subcategoryId, $baseTariffs) {
             $season = Season::create([
+                'id_service' => $serviceId,
                 'name' => $request->name,
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date,
@@ -144,19 +145,13 @@ class SeasonController extends Controller
             'tariffs.*.price' => 'required|numeric|min:0',
         ];
 
-        $existingTariff = Tariff::where('id_service', $serviceId)
-            ->where('id_season', $season->id_season)
-            ->where('id_subcategories', $request->input('id_subcategories'))
-            ->first();
-
-        $pricingType = $validated['pricing_type'];
-
-        if ($pricingType === 'tiered') {
+        if ($request->input('pricing_type') === 'tiered') {
             $rules['tariffs.*.min'] = 'required|integer|min:0';
             $rules['tariffs.*.max'] = 'nullable|integer|min:0';
         }
 
         $validated = $request->validate($rules);
+        $pricingType = $validated['pricing_type'];
         $subcategoryId = $validated['id_subcategories'];
         DB::transaction(function () use ($validated, $serviceId, $season, $subcategoryId, $pricingType) {
             Tariff::where('id_service', $serviceId)
