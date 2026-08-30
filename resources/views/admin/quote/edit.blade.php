@@ -692,6 +692,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     @php
                                         $groups = [];
                                         foreach($hotelsOption1 as $hotel) {
+                                            if (! $hotel->quoteDay || ! $hotel->quoteDay->day_number) {
+                                                continue;
+                                            }
                                             $sid = $hotel->id_service ?? 's'.$hotel->id_quote_accommodation;
                                             if (! isset($groups[$sid])) {
                                                 $groups[$sid] = [
@@ -704,7 +707,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                 ];
                                             }
                                             $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
-                                            $groups[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date->format('d/m/Y');
+                                            $groups[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
                                             $groups[$sid]['prices'][] = $hotel->unit_price;
                                             $groups[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
                                             $roomType = $hotel->room_type ?? 'simple';
@@ -819,6 +822,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     @php
                                         $groups2 = [];
                                         foreach($hotelsOption2 as $hotel) {
+                                            if (! $hotel->quoteDay || ! $hotel->quoteDay->day_number) {
+                                                continue;
+                                            }
                                             $sid = $hotel->id_service ?? 's'.$hotel->id_quote_accommodation;
                                             if (! isset($groups2[$sid])) {
                                                 $groups2[$sid] = [
@@ -830,7 +836,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                 ];
                                             }
                                             $groups2[$sid]['days'][] = $hotel->quoteDay->day_number;
-                                            $groups2[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date->format('d/m/Y');
+                                            $groups2[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
                                             $groups2[$sid]['prices'][] = $hotel->unit_price;
                                             $groups2[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
                                         }
@@ -1118,29 +1124,21 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                 </div>
 
                 <div id="accommodationServiceField" class="form-group" style="margin-bottom:16px;">
-                    <label for="accommodation_service_select">Hotel seleccionado</label>
-                    <select class="form-control" id="accommodation_service_select" name="id_service" onchange="onAccommodationServiceSelect()">
-                        <option value="">Selecciona un hotel de la tabla</option>
-                        @foreach($accommodationServices as $service)
-                            @php
-                                $isAcc = false;
-                                if (isset($service->category) && !empty($service->category->is_accommodation) && $service->category->is_accommodation) {
-                                    $isAcc = true;
-                                } else {
-                                    $hay = strtolower(($service->name_service ?? '') . ' ' . ($service->supplier->supplier_name ?? ''));
-                                    $keywords = ['hotel','hosped','alojam','room','habitaci','hostel','resort','suite','lodging'];
-                                    foreach ($keywords as $kw) {
-                                        if (strpos($hay, $kw) !== false) { $isAcc = true; break; }
-                                    }
-                                }
-                            @endphp
-                            @if($isAcc)
-                                <option value="{{ $service->id_service }}" data-category="{{ $service->id_category ?? '' }}" data-search="{{ strtolower($service->name_service ?? '') }} {{ strtolower($service->supplier->supplier_name ?? '') }}">
-                                    {{ $service->name_service }}
-                                </option>
-                            @endif
-                        @endforeach
-                    </select>
+                    <label>Buscar hotel</label>
+                    <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:12px; align-items:end;">
+                        <div>
+                            <input type="search" id="accommodation_search" class="form-control" placeholder="Buscar por hotel o proveedor" oninput="filterAccommodationCatalog()">
+                        </div>
+                        <div>
+                            <select class="form-control" id="accommodation_category_filter" onchange="filterAccommodationCatalog()">
+                                <option value="">Todas las categorías</option>
+                                @foreach(($accommodationServices->pluck('category')->filter()->unique('id_category')->sortBy('name') ?? collect()) as $category)
+                                    <option value="{{ $category->id_category }}">{{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                    <input type="hidden" id="accommodation_service_select" name="id_service" value="">
                 </div>
 
                 <div id="accommodationRoomTypes" class="form-group" style="display:none; margin-bottom:16px;">
@@ -1156,7 +1154,6 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: var(--qe-ink-500);">Hotel</th>
                                 <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: var(--qe-ink-500);">Proveedor</th>
                                 <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: var(--qe-ink-500);">Categoría</th>
-                                <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: var(--qe-ink-500);">Tarifa</th>
                                 <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: var(--qe-ink-500);">Acción</th>
                             </tr>
                         </thead>
@@ -1175,11 +1172,10 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     }
                                 @endphp
                                 @if($isAcc)
-                                    <tr class="accommodation-row" data-category="{{ $service->id_category ?? '' }}" data-search="{{ strtolower($service->name_service ?? '') }} {{ strtolower($service->supplier->supplier_name ?? '') }}" style="border-bottom:1px solid var(--qe-line);">
-                                        <td style="padding: 10px 12px; font-weight: 500;">{{ $service->name_service }}</td>
-                                        <td style="padding: 10px 12px; color: var(--qe-ink-500);">{{ $service->supplier->supplier_name ?? '-' }}</td>
+                                    <tr class="accommodation-row" data-service-id="{{ $service->id_service }}" data-category="{{ $service->id_category ?? '' }}" data-search="{{ strtolower($service->name_service ?? '') }} {{ strtolower($service->supplier->supplier_name ?? '') }}" style="border-bottom:1px solid var(--qe-line);">
+                                        <td style="padding: 10px 12px; font-weight: 500;"><strong>{{ $service->name_service }}</strong></td>
+                                        <td style="padding: 10px 12px; color: var(--qe-ink-500);"><strong>{{ $service->supplier->supplier_name ?? '-' }}</strong></td>
                                         <td style="padding: 10px 12px;">{{ $service->category->name ?? '-' }}</td>
-                                        <td style="padding: 10px 12px; color: var(--qe-ink-500);">Sin tarifa fija</td>
                                         <td style="padding: 10px 12px; text-align: center;">
                                             <button type="button" class="btn btn-primary btn-sm" onclick="selectAccommodationService({{ $service->id_service }}, '{{ addslashes($service->name_service) }}')">
                                                 <i class="ti ti-plus"></i> Agregar
@@ -1190,6 +1186,13 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             @endforeach
                         </tbody>
                     </table>
+                </div>
+                <div id="accommodationPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:12px; flex-wrap:wrap;">
+                    <small id="accommodationPaginationMeta" style="color:var(--qe-ink-500);">Mostrando 0 resultados</small>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn btn-light btn-sm" id="accommodationPrevPage" onclick="changeAccommodationPage(-1)"><i class="ti ti-chevron-left"></i> Anterior</button>
+                        <button type="button" class="btn btn-light btn-sm" id="accommodationNextPage" onclick="changeAccommodationPage(1)">Siguiente <i class="ti ti-chevron-right"></i></button>
+                    </div>
                 </div>
 
                 <div id="accommodationSelectedService" style="display:none; margin-top:14px; padding:10px 12px; border:1px solid var(--qe-line); border-radius:8px; background:#f8fafc;">
@@ -1225,7 +1228,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
     });
 
     $existingRoomAllocations = $quote->accommodations
-        ->filter(fn ($accommodation) => $accommodation->id_tariff)
+        ->filter(fn ($accommodation) => $accommodation->id_tariff && $accommodation->quoteDay)
         ->mapWithKeys(fn ($accommodation) => [
             $accommodation->option_number . ':' . $accommodation->id_service . ':' . $accommodation->quoteDay->day_number . ':' . $accommodation->id_tariff
                 => (int) $accommodation->room_count,
@@ -2055,44 +2058,88 @@ document.addEventListener('change', function (event) {
 });
 
 // ============================================================
-// MODAL HOSPEDAJE PARA UN DÍA ESPECÍFICO (CORREGIDO)
+// MODAL HOSPEDAJE PARA UN DÍA ESPECÍFICO
 // ============================================================
-function filterAccommodationServices() {
+const accommodationPageSize = 10;
+let accommodationCatalogPage = 1;
+
+function filterAccommodationCatalog() {
     const searchInput = document.getElementById('accommodation_search');
     const categoryInput = document.getElementById('accommodation_category_filter');
-    const select = document.getElementById('accommodation_service_select');
+    const rows = document.querySelectorAll('#accommodationListTableBody .accommodation-row');
+    const hiddenInput = document.getElementById('accommodation_service_select');
 
-    if (!select) {
+    if (!rows.length) {
         return;
     }
 
     const search = (searchInput ? searchInput.value : '').toLowerCase().trim();
-    const selectedCategory = (categoryInput ? categoryInput.value : 'all');
-    let visibleCount = 0;
+    const selectedCategory = (categoryInput ? categoryInput.value : '');
+    const matchingRows = [];
 
-    Array.from(select.options).forEach((option) => {
-        if (!option.value) {
-            option.hidden = false;
-            return;
-        }
-
-        const category = (option.dataset.category || '').toLowerCase();
-        const text = (option.dataset.search || option.textContent || '').toLowerCase();
-        const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
+    rows.forEach((row) => {
+        const category = String(row.dataset.category || '').toLowerCase();
+        const text = String(row.dataset.search || row.textContent || '').toLowerCase();
+        const matchesCategory = !selectedCategory || category === selectedCategory.toLowerCase();
         const matchesSearch = !search || text.includes(search);
         const show = matchesCategory && matchesSearch;
+        row.style.display = 'none';
 
-        option.hidden = !show;
         if (show) {
-            visibleCount++;
+            matchingRows.push(row);
         }
     });
 
-    if (visibleCount === 0) {
-        select.value = '';
+    const totalPages = Math.max(1, Math.ceil(matchingRows.length / accommodationPageSize));
+    accommodationCatalogPage = Math.min(accommodationCatalogPage, totalPages);
+
+    const startIndex = (accommodationCatalogPage - 1) * accommodationPageSize;
+    matchingRows.slice(startIndex, startIndex + accommodationPageSize).forEach((row) => {
+        row.style.display = '';
+    });
+
+    renderAccommodationPagination(matchingRows.length, totalPages);
+
+    if (matchingRows.length === 0) {
+        if (hiddenInput) hiddenInput.value = '';
         resetAccTariffSection();
     }
 }
+
+function renderAccommodationPagination(totalItems, totalPages) {
+    const meta = document.getElementById('accommodationPaginationMeta');
+    const nextButton = document.getElementById('accommodationNextPage');
+    const prevButton = document.getElementById('accommodationPrevPage');
+
+    if (meta) {
+        meta.textContent = totalItems ? `Mostrando ${Math.min(totalItems, (accommodationCatalogPage - 1) * accommodationPageSize + 1)}-${Math.min(totalItems, accommodationCatalogPage * accommodationPageSize)} de ${totalItems} hoteles` : 'Mostrando 0 resultados';
+    }
+
+    if (nextButton) nextButton.disabled = totalPages <= 1 || accommodationCatalogPage >= totalPages;
+    if (prevButton) prevButton.disabled = totalPages <= 1 || accommodationCatalogPage <= 1;
+}
+
+function changeAccommodationPage(direction) {
+    const rows = document.querySelectorAll('#accommodationListTableBody .accommodation-row');
+    const searchInput = document.getElementById('accommodation_search');
+    const categoryInput = document.getElementById('accommodation_category_filter');
+    const search = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const selectedCategory = (categoryInput ? categoryInput.value : '').toLowerCase();
+    const matchingRows = Array.from(rows).filter(row => {
+        const category = String(row.dataset.category || '').toLowerCase();
+        const text = String(row.dataset.search || row.textContent || '').toLowerCase();
+        return (!selectedCategory || category === selectedCategory) && (!search || text.includes(search));
+    });
+
+    const totalPages = Math.max(1, Math.ceil(matchingRows.length / accommodationPageSize));
+    accommodationCatalogPage = Math.min(Math.max(1, accommodationCatalogPage + direction), totalPages);
+    filterAccommodationCatalog();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    accommodationCatalogPage = 1;
+    filterAccommodationCatalog();
+});
 
 function closeAccommodationToDayModal() {
     const modal = document.getElementById('modalAddAccommodationToDay');
@@ -2103,17 +2150,31 @@ function closeAccommodationToDayModal() {
 
     const form = document.getElementById('addAccommodationToDayForm');
     if (form) form.reset();
+
+    const search = document.getElementById('accommodation_search');
+    const category = document.getElementById('accommodation_category_filter');
+    const hiddenInput = document.getElementById('accommodation_service_select');
+    if (search) search.value = '';
+    if (category) category.value = '';
+    if (hiddenInput) hiddenInput.value = '';
+    accommodationCatalogPage = 1;
+    filterAccommodationCatalog();
 }
 
 function selectAccommodationService(serviceId, serviceName) {
     const serviceSelect = document.getElementById('accommodation_service_select');
     if (serviceSelect) {
         serviceSelect.value = serviceId;
-        onAccommodationServiceSelect();
+        const selectedRow = document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${serviceId}"]`);
+        if (selectedRow) {
+            document.querySelectorAll('#accommodationListTableBody .accommodation-row').forEach((row) => row.style.background = '');
+            selectedRow.style.background = '#eef2ff';
+        }
+        onAccommodationServiceSelect(serviceName);
     }
 }
 
-function onAccommodationServiceSelect() {
+function onAccommodationServiceSelect(serviceName = null) {
     const select = document.getElementById('accommodation_service_select');
     const preview = document.getElementById('accPricePreviewText');
     const typesPanel = document.getElementById('accommodationRoomTypes');
@@ -2129,9 +2190,7 @@ function onAccommodationServiceSelect() {
         return;
     }
 
-    const option = select.options[select.selectedIndex];
-    const name = (option && option.text) ? option.text : 'Hotel';
-    const serviceId = select.value;
+    const name = serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel';
     renderAccommodationRoomMatrix();
     if (typesPanel) typesPanel.style.display = 'block';
     preview.innerHTML = '<strong>' + name + '</strong>: define cuántas habitaciones usarás por tipo y por día.';
@@ -2436,19 +2495,22 @@ function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd, 
         const dateFields = document.getElementById('accommodationDateFields');
         if (serviceSelect) {
             serviceSelect.value = serviceId;
-            const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+            const selectedRow = document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${serviceId}"]`);
+            const selectedText = selectedRow?.querySelector('td strong')?.textContent?.trim() || 'Hotel seleccionado';
             if (catalog) catalog.style.display = 'none';
             if (serviceField) serviceField.style.display = 'none';
             if (dateFields) dateFields.style.display = 'none';
             if (selectedService) selectedService.style.display = 'block';
-            if (selectedServiceName) selectedServiceName.textContent = selectedOption?.text || 'Hotel seleccionado';
+            if (selectedServiceName) selectedServiceName.textContent = selectedText;
             if (selectedServiceNights) {
                 selectedServiceNights.textContent = `Días ${selectedStart} al ${selectedEnd}`;
             }
-            onAccommodationServiceSelect();
+            onAccommodationServiceSelect(selectedText);
             prefillAccommodationRoomMatrix(optionNumber, serviceId, selectedStart, selectedEnd);
         }
     } else {
+        accommodationCatalogPage = 1;
+        filterAccommodationCatalog();
         resetAccTariffSection();
     }
 }

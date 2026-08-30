@@ -518,10 +518,6 @@ class QuoteController extends Controller
         $terms = ['hotel', 'hospedaje', 'hospedaje', 'room', 'habitacion', 'habitación', 'alojamiento', 'lodging', 'resort', 'hostel', 'suite'];
 
         return $query->where('status', 'active')
-            ->where(function ($pricingQuery) {
-                $pricingQuery->where('pricing_type', 'flat')
-                    ->orWhereHas('category', fn ($categoryQuery) => $categoryQuery->where('pricing_type', 'flat'));
-            })
             ->where(function ($query) use ($terms) {
                 $query->whereHas('category', function ($subQuery) use ($terms) {
                     $subQuery->where('is_accommodation', true)
@@ -535,7 +531,29 @@ class QuoteController extends Controller
                         $fallback->orWhereRaw('LOWER(name_service) LIKE ?', ['%'.$term.'%']);
                     }
                 });
+            })
+            ->where(function ($query) {
+                $query->where('pricing_type', 'flat')
+                    ->orWhereHas('category', fn ($categoryQuery) => $categoryQuery->where('pricing_type', 'flat'))
+                    ->orWhereHas('tariffs', function ($tariffQuery) {
+                        $tariffQuery->where('status', 'active')
+                            ->whereNull('id_season')
+                            ->where('pricing_type', 'flat');
+                    });
             });
+    }
+
+    private function supportsFlatAccommodationPricing(Service $service): bool
+    {
+        if ($service->pricing_type === 'flat' || $service->category?->pricing_type === 'flat') {
+            return true;
+        }
+
+        return $service->tariffs()
+            ->where('status', 'active')
+            ->whereNull('id_season')
+            ->where('pricing_type', 'flat')
+            ->exists();
     }
 
     private function isAccommodationService(Service $service): bool
@@ -1161,8 +1179,8 @@ class QuoteController extends Controller
             ], 422);
         }
 
-        $service = Service::with('category')->where('status', 'active')->find($data['id_service']);
-        if (! $service || $service->pricing_type !== 'flat' || ! $this->isAccommodationService($service)) {
+        $service = Service::with(['category', 'tariffs'])->where('status', 'active')->find($data['id_service']);
+        if (! $service || ! $this->supportsFlatAccommodationPricing($service) || ! $this->isAccommodationService($service)) {
             return response()->json([
                 'success' => false,
                 'message' => 'El hotel seleccionado no está disponible.',
