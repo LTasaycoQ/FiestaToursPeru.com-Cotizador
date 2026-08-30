@@ -538,6 +538,15 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 
                             @foreach($quote->quoteDays as $index => $day)
                                 <div class="day-panel {{ $index === 0 ? 'active' : '' }}" id="day-panel-{{ $day->id_quote_day }}">
+                                    <div class="bulk-delete-bar" data-bulk-bar="day-panel-{{ $day->id_quote_day }}" style="display:none; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; padding:10px 12px; border:1px solid var(--qe-line); border-radius:10px; background:#f8fafc;">
+                                        <label style="display:flex; align-items:center; gap:8px; margin:0; font-weight:600; color:var(--qe-ink-500);">
+                                            <input type="checkbox" class="bulk-select-all" data-day-panel="day-panel-{{ $day->id_quote_day }}">
+                                            Seleccionar todos
+                                        </label>
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteSelectedServices('day-panel-{{ $day->id_quote_day }}')">
+                                            <i class="ti ti-trash"></i> Eliminar marcados (<span class="bulk-count">0</span>)
+                                        </button>
+                                    </div>
                                     <div class="day-services-list">
                                         @forelse($day->details as $detail)
                                             @php
@@ -546,62 +555,70 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     ? collect($detailService->tariffs ?? [])->groupBy('id_subcategories')
                                                     : collect();
                                             @endphp
+                                            @php
+                                                $quoteHasPassengers = (bool) ($quote->passengers_count ?? 0);
+                                            @endphp
                                             <div class="day-service-card" id="detail-{{ $detail->id_detail_quote }}">
-                                                <div class="service-info">
-                                                    <span class="name">{{ $detail->service->name_service ?? 'Servicio eliminado' }}</span>
-                                                    @php
-                                                        $roomMeta = null;
-                                                        if (!empty($detail->notes) && preg_match('/(simple|doble|triple)/i', $detail->notes)) {
-                                                            $roomMeta = trim($detail->notes);
-                                                        }
-                                                    @endphp
-                                                    @if($roomMeta)
-                                                        <small style="display:block; color: var(--qe-ink-500); margin-top:4px;">{{ $roomMeta }}</small>
-                                                    @endif
+                                                <div class="service-info" style="display:flex;flex-direction:row; align-items:center; gap:10px;">
+                                                    <input type="checkbox" class="service-select-checkbox" data-detail-id="{{ $detail->id_detail_quote }}" aria-label="Seleccionar servicio para eliminar">
+                                                    <div style="flex:1;">
+                                                        <span class="name">{{ $detail->service->name_service ?? 'Servicio eliminado' }}</span>
+                                                        @php
+                                                            $roomMeta = null;
+                                                            if (!empty($detail->notes) && preg_match('/(simple|doble|triple)/i', $detail->notes)) {
+                                                                $roomMeta = trim($detail->notes);
+                                                            }
+                                                        @endphp
+                                                        @if($roomMeta)
+                                                            <small style="display:block; color: var(--qe-ink-500); margin-top:4px;">{{ $roomMeta }}</small>
+                                                        @endif
+                                                    </div>
                                                 </div>
                                                 <div class="actions">
-                                                    <div class="detail-editor">
-                                                        <div class="editor-field">
-                                                            <label for="detail-tariff-{{ $detail->id_detail_quote }}">Categoría</label>
-                                                            <select class="form-control" id="detail-tariff-{{ $detail->id_detail_quote }}" aria-label="Tarifa del servicio" onchange="syncDetailPrice({{ $detail->id_detail_quote }})">
-                                                                @foreach($detailTariffGroups as $subcategoryTariffs)
-                                                                    @php
-                                                                        $detailTariff = $subcategoryTariffs
-                                                                            ->filter(function ($candidateTariff) use ($quote) {
-                                                                                if ($candidateTariff->pricing_type === 'flat') {
-                                                                                    return true;
-                                                                                }
+                                                    @if($quoteHasPassengers)
+                                                        <div class="detail-editor">
+                                                            <div class="editor-field">
+                                                                <label for="detail-tariff-{{ $detail->id_detail_quote }}">Categoría</label>
+                                                                <select class="form-control" id="detail-tariff-{{ $detail->id_detail_quote }}" aria-label="Tarifa del servicio" onchange="syncDetailPrice({{ $detail->id_detail_quote }})">
+                                                                    @foreach($detailTariffGroups as $subcategoryTariffs)
+                                                                        @php
+                                                                            $detailTariff = $subcategoryTariffs
+                                                                                ->filter(function ($candidateTariff) use ($quote) {
+                                                                                    if ($candidateTariff->pricing_type === 'flat') {
+                                                                                        return true;
+                                                                                    }
 
-                                                                                $passengers = $quote->passengers_count ?: 1;
-                                                                                return ($candidateTariff->min_people_count === null || $candidateTariff->min_people_count <= $passengers)
-                                                                                    && ($candidateTariff->max_people_count === null || $candidateTariff->max_people_count >= $passengers);
-                                                                            })
-                                                                            ->sortByDesc('price')
-                                                                            ->first() ?? $subcategoryTariffs->first();
-                                                                    @endphp
-                                                                    <option value="{{ $detailTariff->id_tariff }}" data-price="{{ (float) ($detailTariff->price ?? 0) }}" {{ $detail->id_tariff == $detailTariff->id_tariff ? 'selected' : '' }}>
-                                                                        {{ $detailTariff->subCategory->name ?? 'Tarifa' }}
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
+                                                                                    $passengers = $quote->passengers_count ?: 1;
+                                                                                    return ($candidateTariff->min_people_count === null || $candidateTariff->min_people_count <= $passengers)
+                                                                                        && ($candidateTariff->max_people_count === null || $candidateTariff->max_people_count >= $passengers);
+                                                                                })
+                                                                                ->sortByDesc('price')
+                                                                                ->first() ?? $subcategoryTariffs->first();
+                                                                        @endphp
+                                                                        <option value="{{ $detailTariff->id_tariff }}" data-price="{{ (float) ($detailTariff->price ?? 0) }}" {{ $detail->id_tariff == $detailTariff->id_tariff ? 'selected' : '' }}>
+                                                                            {{ $detailTariff->subCategory->name ?? 'Tarifa' }}
+                                                                        </option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </div>
+                                                            <div class="editor-field">
+                                                                <label for="detail-price-{{ $detail->id_detail_quote }}">Precio unitario</label>
+                                                                <input type="number" class="form-control" id="detail-price-{{ $detail->id_detail_quote }}" value="{{ number_format((float) $detail->unit_price, 2, '.', '') }}" min="0" step="0.01" aria-label="Precio editable">
+                                                            </div>
+                                                            <div class="editor-field">
+                                                                <label for="detail-quantity-{{ $detail->id_detail_quote }}">Pasajeros</label>
+                                                                <input type="number" disabled class="form-control quantity-input" id="detail-quantity-{{ $detail->id_detail_quote }}" value="{{ $detail->quantity ?: ($quote->passengers_count ?: 1) }}" min="1" step="1" aria-label="Cantidad de pasajeros" readonly>
+                                                            </div>
                                                         </div>
-                                                        <div class="editor-field">
-                                                            <label for="detail-price-{{ $detail->id_detail_quote }}">Precio unitario</label>
-                                                            <input type="number" class="form-control" id="detail-price-{{ $detail->id_detail_quote }}" value="{{ number_format((float) $detail->unit_price, 2, '.', '') }}" min="0" step="0.01" aria-label="Precio editable">
-                                                        </div>
-                                                        <div class="editor-field">
-                                                            <label for="detail-quantity-{{ $detail->id_detail_quote }}">Pasajeros</label>
-                                                            <input type="number" disabled class="form-control quantity-input" id="detail-quantity-{{ $detail->id_detail_quote }}" value="{{ $detail->quantity ?: ($quote->passengers_count ?: 1) }}" min="1" step="1" aria-label="Cantidad de pasajeros" readonly>
-                                                        </div>
-                                                        
-                                                    </div>
-                                                    <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}">$ {{ number_format($detail->subtotal ?? 0, 2) }}</span>
+                                                        <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}">$ {{ number_format($detail->subtotal ?? 0, 2) }}</span>
+                                                        <button type="button" class="btn btn-primary btn-sm" onclick="updateServiceDetail({{ $detail->id_detail_quote }})" title="Guardar tarifa y precio">
+                                                            <i class="ti ti-device-floppy"></i>
+                                                        </button>
+                                                    @else
+                                                        <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}" style="color: var(--qe-ink-400); font-style: italic;">Por cotizar</span>
+                                                    @endif
                                                     <button type="button" class="btn btn-danger btn-icon btn-sm" onclick="removeService({{ $detail->id_detail_quote }})" title="Eliminar">
                                                         <i class="ti ti-trash"></i>
-                                                    </button>
-
-                                                    <button type="button" class="btn btn-primary btn-sm" onclick="updateServiceDetail({{ $detail->id_detail_quote }})" title="Guardar tarifa y precio">
-                                                        <i class="ti ti-device-floppy"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -1239,6 +1256,7 @@ const REMOVE_ACCOMMODATION_URL_BASE = '{{ route("admin.quotes.remove-accommodati
 const accommodationTariffs = @json($accommodationTariffs);
 const accommodationDays = @json($quote->quoteDays->pluck('day_number')->values());
 const existingRoomAllocations = @json($existingRoomAllocations);
+const quoteIsCalculated = {{ (int) ((bool) ($quote->passengers_count ?? false)) }};
 let currentOccupancyAccommodationId = null;
 let currentOccupancyAccommodationIds = [];
 let currentOccupancyLabel = '';
@@ -1310,7 +1328,20 @@ function syncDetailPrice(detailId) {
     const tariffSelect = document.getElementById(`detail-tariff-${detailId}`);
     const priceInput = document.getElementById(`detail-price-${detailId}`);
     const quantityInput = document.getElementById(`detail-quantity-${detailId}`);
+    const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
     const selectedOption = tariffSelect ? tariffSelect.options[tariffSelect.selectedIndex] : null;
+
+    if (!quoteIsCalculated) {
+        if (priceInput) {
+            priceInput.value = '';
+        }
+        if (subtotalEl) {
+            subtotalEl.textContent = 'Por cotizar';
+            subtotalEl.style.color = 'var(--qe-ink-400)';
+            subtotalEl.style.fontStyle = 'italic';
+        }
+        return;
+    }
 
     if (selectedOption && priceInput) {
         const numericPrice = Number(String(selectedOption.dataset.price || 0).replace(',', '.')) || 0;
@@ -1322,9 +1353,10 @@ function syncDetailPrice(detailId) {
         const qtyRaw = quantityInput ? String(quantityInput.value || '0').replace(',', '.') : '0';
         const price = Number(priceRaw) || 0;
         const qty = Number(qtyRaw) || 0;
-        const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
         if (subtotalEl) {
             subtotalEl.textContent = `$ ${(price * qty).toFixed(2)}`;
+            subtotalEl.style.color = '';
+            subtotalEl.style.fontStyle = '';
         }
     } catch (e) {
         console.error('syncDetailPrice error', e);
@@ -1333,6 +1365,17 @@ function syncDetailPrice(detailId) {
 
 function updateServiceDetail(detailId, options = {}) {
     const silent = options.silent || false;
+
+    if (!quoteIsCalculated) {
+        if (!silent) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Cotización pendiente',
+                text: 'Define la cantidad de pasajeros y el tipo de tarifa antes de calcular el precio.'
+            });
+        }
+        return;
+    }
 
     const tariffSelect = document.getElementById(`detail-tariff-${detailId}`);
     const priceInput = document.getElementById(`detail-price-${detailId}`);
@@ -1897,6 +1940,80 @@ function addService() {
     });
 }
 
+function syncBulkSelectionState(dayPanel) {
+    if (!dayPanel) return;
+
+    const checkboxes = dayPanel.querySelectorAll('.service-select-checkbox');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked);
+    const bulkBar = dayPanel.querySelector('.bulk-delete-bar');
+    const bulkSelectAll = dayPanel.querySelector('.bulk-select-all');
+    const bulkCount = dayPanel.querySelector('.bulk-count');
+
+    if (bulkBar) {
+        bulkBar.style.display = selected.length > 0 ? 'flex' : 'none';
+    }
+
+    if (bulkSelectAll) {
+        bulkSelectAll.checked = checkboxes.length > 0 && selected.length === checkboxes.length;
+        bulkSelectAll.indeterminate = selected.length > 0 && selected.length < checkboxes.length;
+    }
+
+    if (bulkCount) {
+        bulkCount.textContent = selected.length;
+    }
+}
+
+function deleteSelectedServices(dayPanelId) {
+    const dayPanel = document.getElementById(dayPanelId);
+    if (!dayPanel) return;
+
+    const selectedIds = Array.from(dayPanel.querySelectorAll('.service-select-checkbox:checked'))
+        .map(cb => Number(cb.dataset.detailId))
+        .filter(id => Number.isFinite(id));
+
+    if (selectedIds.length === 0) {
+        Swal.fire({ icon: 'info', title: 'No hay servicios marcados', text: 'Selecciona al menos un servicio para eliminar.' });
+        return;
+    }
+
+    Swal.fire({
+        title: '¿Eliminar servicios seleccionados?',
+        text: `Se eliminarán ${selectedIds.length} servicio(s).`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#991b1b',
+        cancelButtonColor: '#94a3b8',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        const deleteNext = (index) => {
+            if (index >= selectedIds.length) {
+                Swal.fire({ icon: 'success', title: 'Servicios eliminados', timer: 1200, showConfirmButton: false })
+                    .then(() => window.location.reload());
+                return;
+            }
+
+            const detailId = selectedIds[index];
+            const url = REMOVE_SERVICE_URL_BASE.replace('__ID__', detailId);
+            fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' } })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.message || 'No se pudo eliminar uno de los servicios.');
+                    }
+                    deleteNext(index + 1);
+                })
+                .catch((error) => {
+                    Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'No se pudo completar la eliminación.', confirmButtonColor: '#ef4444' });
+                });
+        };
+
+        deleteNext(0);
+    });
+}
+
 function removeService(detailId) {
     Swal.fire({
         title: '¿Eliminar servicio?', text: 'Esta acción no se puede deshacer.', icon: 'warning',
@@ -1918,6 +2035,24 @@ function removeService(detailId) {
             .catch(() => Swal.fire({ icon: 'error', title: 'Error de conexión', confirmButtonColor: '#ef4444' }));
     });
 }
+
+document.addEventListener('change', function (event) {
+    const target = event.target;
+
+    if (target && target.classList.contains('service-select-checkbox')) {
+        const dayPanel = target.closest('.day-panel');
+        syncBulkSelectionState(dayPanel);
+    }
+
+    if (target && target.classList.contains('bulk-select-all')) {
+        const dayPanel = target.closest('.day-panel');
+        const checkboxes = dayPanel ? dayPanel.querySelectorAll('.service-select-checkbox') : [];
+        checkboxes.forEach(cb => {
+            cb.checked = target.checked;
+        });
+        syncBulkSelectionState(dayPanel);
+    }
+});
 
 // ============================================================
 // MODAL HOSPEDAJE PARA UN DÍA ESPECÍFICO (CORREGIDO)
