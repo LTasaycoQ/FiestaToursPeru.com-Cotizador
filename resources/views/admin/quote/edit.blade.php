@@ -739,7 +739,8 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             <div class="accommodation-group" style="border:1px solid var(--qe-line); border-radius:8px; padding:10px; margin-bottom:10px;">
                                                 <div class="group-summary" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                                                     <div style="flex:1; min-width:0;">
-                                                        <div style="font-weight:700;">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</div>
+                                                        <div style="font-weight:700;">{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</div>
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:2px;">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</div>
                                                         @php $uniqueRoomLabels = array_values(array_unique($group['room_labels'] ?? [])); @endphp
                                                         @if(!empty($uniqueRoomLabels))
                                                             <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
@@ -778,7 +779,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                     <span class="day-date">{{ $group['dates'][$d] }}</span>
                                                                 </div>
                                                                 <div class="day-hotel">
-                                                                    <span class="hotel-name">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</span>
+                                                                    <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
                                                                     <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
                                                                 </div>
                                                                 <div class="day-actions">
@@ -864,7 +865,8 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             <div class="accommodation-group" style="border:1px solid var(--qe-line); border-radius:8px; padding:10px; margin-bottom:10px;">
                                                 <div class="group-summary" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                                                     <div style="flex:1; min-width:0;">
-                                                        <div style="font-weight:700;">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</div>
+                                                        <div style="font-weight:700;">{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</div>
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:2px;">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</div>
                                                         @php $uniqueRoomLabels = array_values(array_unique($group['room_labels'] ?? [])); @endphp
                                                         @if(!empty($uniqueRoomLabels))
                                                             <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
@@ -903,7 +905,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                     <span class="day-date">{{ $group['dates'][$d] }}</span>
                                                                 </div>
                                                                 <div class="day-hotel">
-                                                                    <span class="hotel-name">{{ $group['service']->name_service ?? 'Hotel eliminado' }}</span>
+                                                                    <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
                                                                     <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
                                                                 </div>
                                                                 <div class="day-actions">
@@ -1263,6 +1265,7 @@ const quoteIsCalculated = {{ (int) ((bool) ($quote->passengers_count ?? false)) 
 let currentOccupancyAccommodationId = null;
 let currentOccupancyAccommodationIds = [];
 let currentOccupancyLabel = '';
+let accommodationEditingExisting = false;
 
 function openQuoteContactModal() {
     const clientId = document.getElementById('id_client').value;
@@ -2191,6 +2194,13 @@ function onAccommodationServiceSelect(serviceName = null) {
     }
 
     const name = serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel';
+    if (!accommodationEditingExisting) {
+        if (typesPanel) typesPanel.style.display = 'none';
+        if (typesRows) typesRows.innerHTML = '';
+        preview.innerHTML = '<strong>' + name + '</strong>: hotel seleccionado. La distribución de pasajeros y habitaciones se configurará después de registrar esta opción.';
+        return;
+    }
+
     renderAccommodationRoomMatrix();
     if (typesPanel) typesPanel.style.display = 'block';
     preview.innerHTML = '<strong>' + name + '</strong>: define cuántas habitaciones usarás por tipo y por día.';
@@ -2465,6 +2475,7 @@ function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd, 
         return;
     }
 
+    accommodationEditingExisting = Boolean(serviceId);
     if (accOptionInput) accOptionInput.value = optionNumber;
     if (optionLabel) optionLabel.textContent = optionNumber;
     if (actionLabel) actionLabel.textContent = serviceId ? 'Modificar habitaciones' : 'Registrar hotel';
