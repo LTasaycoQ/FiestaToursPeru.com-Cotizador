@@ -391,6 +391,18 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     <label>Mercado</label>
                                     <input type="text" class="form-control" value="{{ $quote->market?->name_labels ?? 'Sin mercado' }}" readonly>
                                 </div>
+                                <div class="form-group">
+                                    <label for="id_language">Idioma de documento <span class="text-danger">*</span></label>
+                                    <select class="form-control @error('id_language') is-invalid @enderror" id="id_language" name="id_language" required>
+                                        <option value="">Seleccione un idioma</option>
+                                        @foreach($languages as $language)
+                                            <option value="{{ $language->id_language }}" {{ old('id_language', $quote->id_language) == $language->id_language ? 'selected' : '' }}>
+                                                {{ $language->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('id_language') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                </div>
                             </div>
                         </div>
 

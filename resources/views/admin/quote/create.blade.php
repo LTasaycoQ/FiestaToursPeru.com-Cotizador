@@ -87,6 +87,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Idioma de la cotización <span style="color:#991b1b">*</span></label>
+                        <select class="form-control" name="id_language" required>
+                            <option value="">Seleccione un idioma</option>
+                            @foreach($languages as $language)
+                                <option value="{{ $language->id_language }}" {{ old('id_language') == $language->id_language ? 'selected' : '' }}>
+                                    {{ $language->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="hint"><i class="ti ti-language"></i> Las descripciones del documento se generarán en este idioma.</div>
+                    </div>
+
+                    <div class="form-group">
                         <label>Contacto</label>
                         <div style="display:flex; gap:8px; align-items:flex-end;">
                             <select class="form-control" name="id_contacts" id="id_contacts" style="flex:1;">

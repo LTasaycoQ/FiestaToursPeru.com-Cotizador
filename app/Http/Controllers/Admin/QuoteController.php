@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\Contact;
 use App\Models\DetailQuote;
 use App\Models\Labels;
+use App\Models\Language;
 use App\Models\Quote;
 use App\Models\QuoteAccommodation;
 use App\Models\QuoteDay;
@@ -108,6 +109,7 @@ class QuoteController extends Controller
         )->get();
 
         $labels = Labels::where('status', 'active')->get();
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
 
         $lastQuote = Quote::orderBy('id_quote', 'desc')->first();
@@ -121,6 +123,7 @@ class QuoteController extends Controller
             'services',
             'accommodationServices',
             'labels',
+            'languages',
             'suppliers',
             'quoteNumber'
         ));
@@ -139,6 +142,7 @@ class QuoteController extends Controller
                 'id_client' => 'nullable|exists:clients,id_client',
                 'id_contacts' => 'nullable|exists:contacts,id_contacts',
                 'id_labels' => 'required|exists:labels,id_labels',
+                'id_language' => 'required|exists:languages,id_language',
                 'days_count' => 'nullable|integer|min:1|max:60',
                 'date_mode' => 'nullable|in:dates,days',
             ];
@@ -170,6 +174,7 @@ class QuoteController extends Controller
                 'id_client' => $request->id_client,
                 'id_contacts' => $request->id_contacts,
                 'id_labels' => $request->id_labels,
+                'id_language' => $request->id_language,
                 'status' => 'draft',
                 'days' => $dateMode === 'days' ? $request->days_count : null,
                 'start_date' => $dateMode === 'dates' ? $request->start_date : null,
@@ -293,6 +298,7 @@ class QuoteController extends Controller
         )->get();
 
         $labels = Labels::where('status', 'active')->get();
+        $languages = Language::where('status', 'active')->orderBy('name')->get();
         $suppliers = Supplier::whereNull('deleted_at')->orderBy('supplier_name')->get();
 
         $quote->load([
@@ -316,6 +322,7 @@ class QuoteController extends Controller
             'services',
             'accommodationServices',
             'labels',
+            'languages',
             'suppliers'
         ));
     }
@@ -369,9 +376,9 @@ class QuoteController extends Controller
             'id_users' => 'nullable|exists:users,id',
             'id_client' => 'nullable|exists:clients,id_client',
             'id_contacts' => 'nullable|exists:contacts,id_contacts',
+            'id_language' => 'nullable|exists:languages,id_language',
             'status' => 'nullable|in:draft,sent,approved,rejected,expired,cancelled',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'start_date' => 'nullable|date',            'end_date' => 'nullable|date|after_or_equal:start_date',
             'expiration_date' => 'nullable|date|after_or_equal:start_date',
             'passengers_count' => 'nullable|integer|min:1',
             'notes' => 'nullable|string',
@@ -395,6 +402,8 @@ class QuoteController extends Controller
                 'id_users' => $request->id_users ?? auth()->id(),
                 'id_client' => $request->id_client,
                 'id_contacts' => $request->id_contacts,
+                'id_labels' => $request->id_labels ?? $quote->id_labels,
+                'id_language' => $request->id_language ?? $quote->id_language,
                 'status' => $newStatus,
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date,

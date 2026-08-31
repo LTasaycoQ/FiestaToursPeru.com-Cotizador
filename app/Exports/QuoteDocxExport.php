@@ -17,6 +17,7 @@ class QuoteDocxExport
         $quote = Quote::with([
             'client',
             'contact',
+            'language',
             'quoteDays.details.service.descriptions.language',
         ])->findOrFail($this->quoteId);
 
@@ -60,7 +61,7 @@ class QuoteDocxExport
                 $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
                 $section->addText($serviceName, ['bold' => true, 'size' => 12]);
 
-                $description = $this->extractDescription($detail->service);
+                $description = $this->extractDescription($detail->service, $quote->id_language);
                 if (trim((string) $description) === '') {
                     $section->addText('');
                     continue;
@@ -84,10 +85,18 @@ class QuoteDocxExport
         return response()->download($tempPath, 'cotizacion-'.$this->quoteId.'.docx')->deleteFileAfterSend(true);
     }
 
-    private function extractDescription(?Service $service): string
+    private function extractDescription(?Service $service, ?int $languageId = null): string
     {
         if (! $service) {
             return '';
+        }
+
+        $languageDescription = $languageId
+            ? $service->descriptions()->where('id_language', $languageId)->first()?->description
+            : null;
+
+        if (is_string($languageDescription) && trim($languageDescription) !== '') {
+            return trim($languageDescription);
         }
 
         if (! empty($service->description)) {

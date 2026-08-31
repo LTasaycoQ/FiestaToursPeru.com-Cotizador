@@ -22,6 +22,7 @@ class Quote extends Model
         'id_users',
         'id_contacts',
         'id_labels',
+        'id_language',
         'name',
         'quote_number',
         'correlative',
@@ -71,6 +72,11 @@ class Quote extends Model
     public function market(): BelongsTo
     {
         return $this->belongsTo(Labels::class, 'id_labels', 'id_labels');
+    }
+
+    public function language(): BelongsTo
+    {
+        return $this->belongsTo(Language::class, 'id_language', 'id_language');
     }
 
     public function quoteDays(): HasMany
