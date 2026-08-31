@@ -558,7 +558,7 @@
 
 
                 <a href="{{ route('admin.quotes.index') }}" class="sb-link {{ request()->routeIs('admin.quotes.*') ? 'active' : '' }}">
-                   <i class="ti ti-lock-dollar"></i><span class="sb-text">Proyectos</span>
+                   <i class="ti ti-lock-dollar"></i><span class="sb-text">Propuestas</span>
                 </a>
 
                     <a href="{{ route('finance.index') }}" class="sb-link {{ request()->routeIs('finance.*') ? 'active' : '' }}">

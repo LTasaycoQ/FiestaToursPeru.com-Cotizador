@@ -472,6 +472,24 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                         <option value="privado">Privado</option>
                                     </select>
                                 </div>
+                                <div class="form-group" style="margin-top:16px;">
+                                    <label>Acomodación para todos los hoteles</label>
+                                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+                                        <div>
+                                            <small>Simples (SPL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[simple]" min="0" value="0">
+                                        </div>
+                                        <div>
+                                            <small>Dobles (DBL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[doble]" min="0" value="0">
+                                        </div>
+                                        <div>
+                                            <small>Triples (TPL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[triple]" min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <small style="display:block; color:var(--qe-ink-500); margin-top:6px;">Esta distribución se aplicará a todos los hoteles de las opciones. La asignación individual de pasajeros se hará después.</small>
+                                </div>
                                 <div class="form-actions" style="justify-content:flex-end;">
                                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('quotePricingModal').style.display='none'">Cancelar</button>
                                     <button type="submit" class="btn btn-primary">Calcular cotización</button>
@@ -1219,13 +1237,17 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 @php
     $accommodationTariffs = $accommodationServices->mapWithKeys(function ($service) {
         return [
-            $service->id_service => $service->tariffs->map(function ($tariff) {
-                return [
-                    'id_tariff' => $tariff->id_tariff,
-                    'name' => $tariff->subCategory->name ?? 'Sin subcategoría',
-                    'price' => (float) $tariff->price,
-                ];
-            })->values(),
+            $service->id_service => $service->tariffs
+                ->where('status', 'active')
+                ->groupBy(fn ($tariff) => strtolower(trim((string) ($tariff->subCategory->name ?? 'Sin subcategoría'))))
+                ->map(fn ($tariffs) => $tariffs->sortByDesc(fn ($tariff) => $tariff->id_season !== null)->first())
+                ->map(function ($tariff) {
+                    return [
+                        'id_tariff' => $tariff->id_tariff,
+                        'name' => $tariff->subCategory->name ?? 'Sin subcategoría',
+                        'price' => (float) $tariff->price,
+                    ];
+                })->values(),
         ];
     });
 

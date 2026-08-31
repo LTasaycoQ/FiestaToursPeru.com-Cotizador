@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 class QuoteController extends Controller
@@ -91,7 +92,17 @@ class QuoteController extends Controller
             ->get();
 
         $accommodationServices = $this->accommodationServicesQuery(
-            Service::with(['labels', 'supplier', 'tariffs'])
+            Service::with([
+                'labels',
+                'supplier',
+                'tariffs' => fn ($query) => $query
+                    ->where('status', 'active')
+                    ->where(function ($seasonQuery) {
+                        $seasonQuery->whereNull('id_season')
+                            ->orWhereHas('season', fn ($query) => $query->where('status', 'active'));
+                    })
+                    ->with('subCategory'),
+            ])
         )->get();
 
         $labels = Labels::where('status', 'active')->get();
@@ -265,7 +276,18 @@ class QuoteController extends Controller
             ->get();
 
         $accommodationServices = $this->accommodationServicesQuery(
-            Service::with(['labels', 'supplier', 'tariffs', 'category'])
+            Service::with([
+                'labels',
+                'supplier',
+                'category',
+                'tariffs' => fn ($query) => $query
+                    ->where('status', 'active')
+                    ->where(function ($seasonQuery) {
+                        $seasonQuery->whereNull('id_season')
+                            ->orWhereHas('season', fn ($query) => $query->where('status', 'active'));
+                    })
+                    ->with('subCategory'),
+            ])
         )->get();
 
         $labels = Labels::where('status', 'active')->get();
@@ -427,6 +449,10 @@ class QuoteController extends Controller
         $data = $request->validate([
             'passengers_count' => 'required|integer|min:1',
             'pricing_type' => 'required|in:economico,vip,privado',
+            'room_counts' => 'nullable|array',
+            'room_counts.simple' => 'nullable|integer|min:0',
+            'room_counts.doble' => 'nullable|integer|min:0',
+            'room_counts.triple' => 'nullable|integer|min:0',
         ]);
 
         DB::transaction(function () use ($quote, $data): void {
@@ -473,6 +499,120 @@ class QuoteController extends Controller
                 }
 
                 $detail->update($detailData);
+            }
+
+            $roomCounts = collect($data['room_counts'] ?? [])
+                ->mapWithKeys(fn ($count, $roomType) => [$roomType => (int) $count])
+                ->only(['simple', 'doble', 'triple']);
+            $totalCapacity = ($roomCounts['simple'] ?? 0)
+                + (($roomCounts['doble'] ?? 0) * 2)
+                + (($roomCounts['triple'] ?? 0) * 3);
+
+            if ($roomCounts->sum() > 0 && $totalCapacity < $passengersCount) {
+                throw ValidationException::withMessages([
+                    'room_counts' => 'La capacidad de las habitaciones debe cubrir a todos los pasajeros.',
+                ]);
+            }
+
+            if ($roomCounts->sum() > 0) {
+                $accommodations = $quote->accommodations()
+                    ->with(['service', 'quoteDay'])
+                    ->get()
+                    ->filter(fn ($accommodation) => $accommodation->service && $accommodation->quoteDay)
+                    ->groupBy(fn ($accommodation) => $accommodation->option_number.':'.$accommodation->id_quote_day.':'.$accommodation->id_service);
+
+                foreach ($accommodations as $accommodationGroup) {
+                    $firstAccommodation = $accommodationGroup->first();
+                    $service = $firstAccommodation->service;
+                    $accommodationDate = $firstAccommodation->quoteDay?->date;
+                    $tariffsByRoomType = [];
+
+                    foreach ($roomCounts as $roomType => $roomCount) {
+                        if ($roomCount < 1) {
+                            continue;
+                        }
+
+                        $patterns = match ($roomType) {
+                            'simple' => ['%spl%', '%single%', '%simple%'],
+                            'doble' => ['%dbl%', '%double%', '%doble%', '%matrimonial%'],
+                            'triple' => ['%tpl%', '%triple%'],
+                        };
+
+                        $tariffQuery = Tariff::where('id_service', $service->id_service)
+                            ->where('status', 'active')
+                            ->where(function ($seasonQuery) {
+                                $seasonQuery->whereNull('id_season')
+                                    ->orWhereHas('season', fn ($query) => $query->where('status', 'active'));
+                            });
+
+                        if ($accommodationDate) {
+                            $tariffQuery->where(function ($query) use ($accommodationDate) {
+                                $query
+                                    ->whereNull('id_season')
+                                    ->orWhereHas('season', function ($seasonQuery) use ($accommodationDate) {
+                                        $seasonQuery
+                                            ->where('status', 'active')
+                                            ->whereDate('start_date', '<=', $accommodationDate)
+                                            ->whereDate('end_date', '>=', $accommodationDate);
+                                    });
+                            });
+                        }
+
+                        $tariff = $tariffQuery
+                            ->whereHas('subCategory', function ($query) use ($patterns) {
+                                $query->where(function ($subQuery) use ($patterns) {
+                                    foreach ($patterns as $index => $pattern) {
+                                        $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                                        $subQuery->{$method}('LOWER(name) LIKE ?', [$pattern]);
+                                    }
+                                });
+                            })
+                            ->when(
+                                $accommodationDate,
+                                fn ($query) => $query->orderByRaw('CASE WHEN id_season IS NULL THEN 0 ELSE 1 END DESC')
+                            )
+                            ->orderBy('price')
+                            ->first();
+
+                        if ($tariff) {
+                            $tariffsByRoomType[$roomType] = $tariff;
+                        }
+                    }
+
+                    if (count($tariffsByRoomType) !== $roomCounts->filter(fn ($count) => $count > 0)->count()) {
+                        throw ValidationException::withMessages([
+                            'room_counts' => "El hotel {$service->name_service} no tiene tarifas SPL, DBL o TPL configuradas para la distribución seleccionada.",
+                        ]);
+                    }
+
+                    foreach ($accommodationGroup as $oldAccommodation) {
+                        \DB::table('quote_accommodation_occupant')
+                            ->where('id_quote_accommodation', $oldAccommodation->id_quote_accommodation)
+                            ->delete();
+                    }
+                    $accommodationGroup->each->delete();
+
+                    foreach ($roomCounts as $roomType => $roomCount) {
+                        if ($roomCount < 1) {
+                            continue;
+                        }
+
+                        $tariff = $tariffsByRoomType[$roomType];
+                        QuoteAccommodation::create([
+                            'id_quote' => $quote->id_quote,
+                            'option_number' => $firstAccommodation->option_number,
+                            'id_quote_day' => $firstAccommodation->id_quote_day,
+                            'id_service' => $service->id_service,
+                            'id_tariff' => $tariff->id_tariff,
+                            'id_supplier' => $service->id_supplier,
+                            'room_type' => $roomType,
+                            'room_capacity' => $this->getRoomCapacity($roomType),
+                            'room_count' => $roomCount,
+                            'unit_price' => (float) $tariff->price,
+                            'subtotal' => (float) $tariff->price * $roomCount,
+                        ]);
+                    }
+                }
             }
 
             $quote->update(['passengers_count' => $passengersCount]);
@@ -537,7 +677,6 @@ class QuoteController extends Controller
                     ->orWhereHas('category', fn ($categoryQuery) => $categoryQuery->where('pricing_type', 'flat'))
                     ->orWhereHas('tariffs', function ($tariffQuery) {
                         $tariffQuery->where('status', 'active')
-                            ->whereNull('id_season')
                             ->where('pricing_type', 'flat');
                     });
             });
@@ -551,7 +690,6 @@ class QuoteController extends Controller
 
         return $service->tariffs()
             ->where('status', 'active')
-            ->whereNull('id_season')
             ->where('pricing_type', 'flat')
             ->exists();
     }
