@@ -276,6 +276,18 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 </style>
 @endpush
 
+   <nav class="quote-main-tabs" style="width:100%; justify-content: space-between;" aria-label="Secciones de la cotización">
+                        <button  style="width: 33.3%; height: 50px; text-align:center; display:flex; justify-content: center; align-items: center; background-color: #f8f9fa; border: 1px solid #dee2e6;" type="button" class="quote-main-tab" data-quote-tab="information" onclick="switchQuoteTab('information')">
+                            <i class="ti ti-info-circle"></i> Información
+                        </button>
+                        <button active  style="width: 33.3%; height: 50px; text-align:center; display:flex; justify-content: center; align-items: center; background-color: #f8f9fa; border: 1px solid #dee2e6;" type="button" class="quote-main-tab active" data-quote-tab="itinerary" onclick="switchQuoteTab('itinerary')">
+                            <i class="ti ti-route"></i> Programa
+                        </button>
+                        <button  style="width: 33.3%; height: 50px; text-align:center; display:flex; justify-content: center; align-items: center; background-color: #f8f9fa; border: 1px solid #dee2e6;" type="button" class="quote-main-tab" data-quote-tab="documents" onclick="switchQuoteTab('documents')">
+                            <i class="ti ti-file-text"></i> Documentos
+                        </button>
+                    </nav>
+
 <div class="container-fluid quote-edit-page">
     <div class="row">
         <div class="col-12">
@@ -284,7 +296,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 
                 <div class="qe-header">
                     <div class="qe-header-left">
-                        <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">
+                        <a href="{{ route('admin.quotes.index', $quote->id_quote) }}" class="btn btn-secondary">
                             <i class="ti ti-chevron-left"></i>
                         </a>
                         <div style="display:flex; align-items:center; gap:12px;">
@@ -299,7 +311,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             {{ $quote->status_label }}
                         </span>
                     </div>
-                    <div class="header-actions" style="display:flex; gap:8px;">
+                    {{-- <div class="header-actions" style="display:flex; gap:8px;">
                         <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
                             <i class="ti ti-file-spreadsheet"></i> Excel
                         </a>
@@ -309,7 +321,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <button class="btn btn-danger" onclick="confirmDelete({{ $quote->id_quote }}, '{{ addslashes($quote->name ?? 'Cotización') }}')">
                             <i class="ti ti-trash"></i> Eliminar
                         </button>
-                    </div>
+                    </div> --}}
                 </div>
 
                 <!-- ===== BODY ===== -->
@@ -346,17 +358,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         </div>
                     @endif
 
-                    <nav class="quote-main-tabs" aria-label="Secciones de la cotización">
-                        <button type="button" class="quote-main-tab" data-quote-tab="information" onclick="switchQuoteTab('information')">
-                            <i class="ti ti-info-circle"></i> Información
-                        </button>
-                        <button type="button" class="quote-main-tab active" data-quote-tab="itinerary" onclick="switchQuoteTab('itinerary')">
-                            <i class="ti ti-route"></i> Itinerario
-                        </button>
-                        <button type="button" class="quote-main-tab" data-quote-tab="documents" onclick="switchQuoteTab('documents')">
-                            <i class="ti ti-file-text"></i> Documentos
-                        </button>
-                    </nav>
+                 
 
                     <div class="quote-main-panel" id="quote-tab-information">
                     <!-- ===== FORMULARIO DATOS GENERALES ===== -->
@@ -488,7 +490,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                         </a>
                                     </div>
                                 </div>
-                                <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
+                                {{-- <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
                                     <div class="qe-card-body" style="padding:20px;">
                                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
                                             <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-text"></i></div>
@@ -501,7 +503,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             <i class="ti ti-eye"></i> Ver PDF
                                         </a>
                                     </div>
-                                </div>
+                                </div> --}}
                                 <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
                                     <div class="qe-card-body" style="padding:20px;">
                                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
@@ -654,17 +656,10 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             <div class="day-service-card" id="detail-{{ $detail->id_detail_quote }}">
                                                 <div class="service-info" style="display:flex;flex-direction:row; align-items:center; gap:10px;">
                                                     <input type="checkbox" class="service-select-checkbox" data-detail-id="{{ $detail->id_detail_quote }}" aria-label="Seleccionar servicio para eliminar">
-                                                    <div style="flex:1;">
+                                                    <div style="display:flex; flex-direction:column; gap:2px;">
                                                         <span class="name">{{ $detail->service->name_service ?? 'Servicio eliminado' }}</span>
-                                                        @php
-                                                            $roomMeta = null;
-                                                            if (!empty($detail->notes) && preg_match('/(simple|doble|triple)/i', $detail->notes)) {
-                                                                $roomMeta = trim($detail->notes);
-                                                            }
-                                                        @endphp
-                                                        @if($roomMeta)
-                                                            <small style="display:block; color: var(--qe-ink-500); margin-top:4px;">{{ $roomMeta }}</small>
-                                                        @endif
+                                                        <span class="category" style="font-size:12px; color: red; font-weight:600;">
+                                                            {{ $detail->notes ?? '' }}
                                                     </div>
                                                 </div>
                                                 <div class="actions">
@@ -704,9 +699,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                             </div>
                                                         </div>
                                                         <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}">$ {{ number_format($detail->subtotal ?? 0, 2) }}</span>
-                                                        <button type="button" class="btn btn-primary btn-sm" onclick="updateServiceDetail({{ $detail->id_detail_quote }})" title="Guardar tarifa y precio">
-                                                            <i class="ti ti-device-floppy"></i>
-                                                        </button>
+                                                      
                                                     @else
                                                         <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}" style="color: var(--qe-ink-400); font-style: italic;">Por cotizar</span>
                                                     @endif
@@ -846,16 +839,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 @endforeach
                                                             </div>
                                                         @endif
-                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
-                                                            @foreach($ranges as $r)
-                                                                @if($r[0] == $r[1])
-                                                                    <span>Día {{ $r[0] }} ({{ $group['dates'][$r[0]] }})</span>
-                                                                @else
-                                                                    <span>Día {{ $r[0] }}–{{ $r[1] }} ({{ $group['dates'][$r[0]] }} – {{ $group['dates'][$r[1]] }})</span>
-                                                                @endif
-                                                                @if(! $loop->last) <span style="margin:0 8px;">•</span> @endif
-                                                            @endforeach
-                                                        </div>
+                                                       
                                                     </div>
                                                     <div style="display:flex; gap:8px; align-items:center;">
                                                         <div style="min-width:80px; text-align:right; font-weight:600;">@if($priceDisplay) $ {{ $priceDisplay }} @else Varios precios @endif</div>
