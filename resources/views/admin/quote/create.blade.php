@@ -321,6 +321,7 @@ function cargarContactos() {
                 contactsSelect.appendChild(opt);
             });
         })
+        
         .catch(() => { contactsSelect.innerHTML = '<option value="">Error al cargar</option>'; });
 }
 
@@ -351,3 +352,6 @@ function cargarContactos() {
 @endpush
 
 @endsection
+
+
+

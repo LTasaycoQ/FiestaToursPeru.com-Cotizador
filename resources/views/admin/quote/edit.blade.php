@@ -62,7 +62,7 @@
 .qe-collapsible[open] summary .qe-collapse-arrow { transform: rotate(180deg); }
 .qe-collapsible-content { padding: 0 18px 18px; }
 
-.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 20px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 20px; }
 .form-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .form-group { margin-bottom: 0; }
 .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--qe-ink-700); margin-bottom: 6px; }
@@ -374,25 +374,12 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     <input type="text" class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name', $quote->name) }}" maxlength="300">
                                     @error('name') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
-                                <div class="form-group">
-                                    <label for="status">Estado</label>
-                                    <select class="form-control" id="status" name="status">
-                                        <option value="draft" {{ $quote->status == 'draft' ? 'selected' : '' }}>Borrador</option>
-                                        <option value="sent" {{ $quote->status == 'sent' ? 'selected' : '' }}>Enviada</option>
-                                        <option value="approved" {{ $quote->status == 'approved' ? 'selected' : '' }}>Aprobada</option>
-                                        <option value="rejected" {{ $quote->status == 'rejected' ? 'selected' : '' }}>Rechazada</option>
-                                        <option value="expired" {{ $quote->status == 'expired' ? 'selected' : '' }}>Vencida</option>
-                                        <option value="cancelled" {{ $quote->status == 'cancelled' ? 'selected' : '' }}>Cancelada</option>
-                                    </select>
-                                </div>
+                               
                                 <div class="form-group">
                                     <label for="passengers_count">Pasajeros</label>
                                     <input type="number" class="form-control" id="passengers_count" name="passengers_count" value="{{ old('passengers_count', $quote->passengers_count) }}" min="1">
                                 </div>
-                                <div class="form-group">
-                                    <label>Mercado</label>
-                                    <input type="text" class="form-control" value="{{ $quote->market?->name_labels ?? 'Sin mercado' }}" readonly>
-                                </div>
+                                
                                 <div class="form-group">
                                     <label for="id_language">Idioma de documento <span class="text-danger">*</span></label>
                                     <select class="form-control @error('id_language') is-invalid @enderror" id="id_language" name="id_language" required>
@@ -404,6 +391,12 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                         @endforeach
                                     </select>
                                     @error('id_language') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                </div>
+
+
+                                <div class="form-group">
+                                    <label>Mercado</label>
+                                    <input type="text" class="form-control" value="{{ $quote->market?->name_labels ?? 'Sin mercado' }}" readonly>
                                 </div>
                             </div>
                         </div>
@@ -619,7 +612,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             <div class="day-tabs" id="dayTabs">
                                 @foreach($quote->quoteDays as $index => $day)
                                     <button type="button" class="day-tab {{ $index === 0 ? 'active' : '' }}" data-day-panel="day-panel-{{ $day->id_quote_day }}" onclick="switchDayTab(this)">
-                                        <span>{{ $day->name ?: 'Día '.$day->day_number }}</span>
+                                        <span>{{ 'Día '.$day->day_number }}</span>
                                     </button>
                                 @endforeach
                             </div>
