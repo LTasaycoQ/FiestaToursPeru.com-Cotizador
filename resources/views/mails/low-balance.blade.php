@@ -33,7 +33,7 @@
                               <tr>
                                 <td style="padding:10px 0;border-bottom:1px solid #eee;">
                                   <span style="color:#999;font-size:11px;letter-spacing:2px;text-transform:uppercase;">BALANCE ACTUAL</span><br/>
-                                  <span style="color:#1a1a1a;font-size:16px;">${{ $balance }}</span>
+                                  <span style="color:#1a1a1a;font-size:16px;">{{ $projectCurrency }}{{ $balance }}</span>
                                 </td>
                               </tr>
                               </tr>

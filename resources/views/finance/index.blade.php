@@ -108,7 +108,7 @@
                             <div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:4px;margin-top:3px">
                                 <i class="ti ti-coin" style="font-size:12px"></i>
                                 @if($project->balance)
-                                    <span><strong>Balance:</strong> S/{{ number_format($project->balance->amount, 2) }}</span>
+                                    <span><strong>Balance:</strong> {{ $project->currency_symbol }} {{ number_format($project->balance->amount, 2) }}</span>
                                 @else
                                     <span style="font-weight:700;color: #be103f">No Asignado</span>
                                 @endif
@@ -122,6 +122,7 @@
                                 class="btn-edit-project"
                                 data-id="{{ $project->id_proyect }}"
                                 data-name="{{ $project->name }}"
+                                data-currency="{{ $project->currency ?? 'S/' }}"
                                 onclick="event.stopPropagation()"
                                 style="padding:6px 8px;border-radius:6px;border:1px solid #e2e8f0;color:#64748b;font-size:14px;background:none;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center"
                                 onmouseover="this.style.borderColor='#8b5cf6';this.style.color='#8b5cf6'"
@@ -216,7 +217,7 @@
             <input type="hidden" name="_method" id="form-method" value="POST">
             <input type="hidden" name="project_id" id="project-id-field" value="{{ old('project_id') }}">
 
-            <div style="margin-bottom:1.5rem">
+            <div style="margin-bottom:1.2rem">
                 <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px">
                     Nombre del proyecto <span style="color:#ef4444">*</span>
                 </label>
@@ -226,6 +227,20 @@
                        onfocus="this.style.borderColor='#8b5cf6'"
                        onblur="this.style.borderColor='{{ $errors->has('name') ? '#ef4444' : '#e2e8f0' }}'">
                 @error('name')
+                    <div style="color:#ef4444;font-size:12px;margin-top:4px">{{ $message }}</div>
+                @enderror
+            </div>
+
+            <div style="margin-bottom:1.5rem">
+                <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px">
+                    Moneda del proyecto <span style="color:#ef4444">*</span>
+                </label>
+                <select name="currency" id="project-currency" required
+                        style="width:100%;padding:.6rem .8rem;border:1px solid {{ $errors->has('currency') ? '#ef4444' : '#e2e8f0' }};border-radius:8px;font-size:13px;color:#0f172a;outline:none;transition:border-color .15s;box-sizing:border-box;background:#fff">
+                    <option value="S/" {{ old('currency', 'S/') === 'S/' ? 'selected' : '' }}>S/ Soles</option>
+                    <option value="$" {{ old('currency') === '$' ? 'selected' : '' }}>$ Dólares</option>
+                </select>
+                @error('currency')
                     <div style="color:#ef4444;font-size:12px;margin-top:4px">{{ $message }}</div>
                 @enderror
             </div>
@@ -263,16 +278,18 @@
         document.getElementById('form-method').value = 'POST';
         document.getElementById('project-id-field').value = '';
         document.getElementById('project-name').value = '';
+        document.getElementById('project-currency').value = 'S/';
         document.getElementById('project-modal').style.display = 'flex';
         setTimeout(() => document.getElementById('project-name').focus(), 50);
     }
 
-    function openEditModal(id, name) {
+    function openEditModal(id, name, currency = 'S/') {
         document.getElementById('modal-title-text').textContent = 'Editar proyecto';
         document.getElementById('project-form').action = `/finance/${id}`;
         document.getElementById('form-method').value = 'PUT';
         document.getElementById('project-id-field').value = id;
         document.getElementById('project-name').value = name || '';
+        document.getElementById('project-currency').value = currency || 'S/';
         document.getElementById('project-modal').style.display = 'flex';
         setTimeout(() => document.getElementById('project-name').focus(), 50);
     }
@@ -291,7 +308,7 @@
 
     document.querySelectorAll('.btn-edit-project').forEach(function(btn) {
         btn.addEventListener('click', function() {
-            openEditModal(this.dataset.id, this.dataset.name);
+            openEditModal(this.dataset.id, this.dataset.name, this.dataset.currency);
         });
     });
 

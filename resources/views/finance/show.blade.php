@@ -213,6 +213,7 @@
         <a href="{{ route('finance.index') }}" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:6px">
             <i class="ti ti-arrow-left" style="font-size:15px"></i> Volver
         </a>
+          @php $user = auth()->user(); @endphp
 
         @if(($project->balance->amount ?? 0) == 0)
             <button onclick="openSetInitialBalanceModal()" 
@@ -220,27 +221,42 @@
                 <i class="ti ti-plus"></i> Asignar Balance Inicial
             </button>
         @else
-            <button onclick="openRechargeModal()" 
-                    style="padding:.5rem 1.2rem;background: #2e453d;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                <i class="ti ti-plus-circle"></i> Recargar Balance
-            </button>
+            @if($user->isAdmin() || $user->email === 'administracion1@fiestatoursperu.com')
+                <button onclick="openRechargeModal()" 
+                        style="padding:.5rem 1.2rem;background: #2e453d;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    <i class="ti ti-plus-circle"></i> Recargar Balance
+                </button>
 
-            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-                <a href="{{ route('finance.export.all', $project->id_proyect) }}" class="btn-export" style="background:#1a5c38;">
-                    <i class="ti ti-file-excel"></i> Exportar Todos
-                </a>
-            
-            </div>
+                <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                    <a href="{{ route('finance.export.all', $project->id_proyect) }}" class="btn-export" style="background:#1a5c38;">
+                        <i class="ti ti-file-excel"></i> Exportar Todos
+                    </a>
+                
+                </div>
+            @endif
+Q
         @endif
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2rem;margin-bottom:1.5rem">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-bottom:1.5rem">
     <div style="background: #141C2F;border-radius:14px;border:1px solid #4f6492;padding:1.5rem;text-align:center;box-shadow: 0 4px 6px rgba(0, 0, 0, 0.28);">
         <div style="font-size:12px;color: #b8b9ba;text-transform:uppercase;font-weight:600;letter-spacing:.5px">Balance Disponible</div>
         <div style="font-size:28px;font-weight:700;color:#ffffff;margin-top:4px">
-            S/ {{ number_format($project->balance->amount ?? 0, 2) }}
+            {{ $currencySymbol }} {{ number_format($project->balance->amount ?? 0, 2) }}
         </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #183d3d, #274f4f);border-radius:14px;border:1px solid #3fd5b7;padding:1.5rem;text-align:center;box-shadow: 0 4px 6px rgba(0, 0, 0, 0.28);position:relative;">
+        <div style="font-size:12px;color: rgba(255,255,255,.8);text-transform:uppercase;font-weight:600;letter-spacing:.5px">Balance Real en el Banco</div>
+        <div style="font-size:28px;font-weight:700;color:#ffffff;margin-top:4px">
+            {{ $currencySymbol }} {{ number_format($realBalance ?? 0, 2) }}
+        </div>
+        @if($user->isAdmin() || $user->email === 'administracion1@fiestatoursperu.com')
+            <button type="button" onclick="openRealBalanceModal()" style="margin-top:12px;padding:.5rem .9rem;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;font-weight:600;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                <i class="ti ti-pencil"></i> Actualizar
+            </button>
+        @endif
     </div>
 </div>
 
@@ -252,9 +268,11 @@
         <button class="tab-btn" onclick="switchTab('operativos', this)">
             <i class="ti ti-category"></i> Gestión Operativa
         </button>
-        <button class="tab-btn" onclick="switchTab('recargas', this)">
-            <i class="ti ti-history"></i> Recargas
-        </button>
+         @if($user->isAdmin() || $user->email === 'administracion1@fiestatoursperu.com')
+            <button class="tab-btn" onclick="switchTab('recargas', this)">
+                <i class="ti ti-history"></i> Recargas
+            </button>
+        @endif
     </div>
 </div>
 
@@ -307,7 +325,7 @@
                                     {{ $expense->file_number }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center;font-weight:600;color:#ef4444">
-                                    -${{ number_format($expense->amount, 2) }}
+                                    -{{ $currencySymbol }} {{ number_format($expense->amount, 2) }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center">
                                     <div style="display:flex;gap:4px;justify-content:center">
@@ -428,7 +446,7 @@
                                     </span>
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center;font-weight:600;color:#ef4444">
-                                    -${{ number_format($expense->amount, 2) }}
+                                    -{{ $currencySymbol }} {{ number_format($expense->amount, 2) }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center">
                                     <div style="display:flex;gap:4px;justify-content:center">
@@ -538,13 +556,13 @@
                                     {{ $recharge->recharge_date->format('d/m/Y') }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center;font-weight:600;color:#10b981">
-                                    +${{ number_format($recharge->amount, 2) }}
+                                    +{{ $currencySymbol }} {{ number_format($recharge->amount, 2) }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center;color:#64748b">
-                                    ${{ number_format($recharge->previous_balance, 2) }}
+                                    {{ $currencySymbol }} {{ number_format($recharge->previous_balance, 2) }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center;font-weight:600;color:#0f172a">
-                                    ${{ number_format($recharge->new_balance, 2) }}
+                                    {{ $currencySymbol }} {{ number_format($recharge->new_balance, 2) }}
                                 </td>
                                 <td style="padding:.6rem .8rem;text-align:center">
                                     <div style="display:flex;gap:4px;justify-content:center">
@@ -680,6 +698,42 @@
                 <button type="submit" style="padding:.6rem 1.4rem;background: #32473c;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;gap:6px"
                         onmouseover="this.style.background='#25503a'" onmouseout="this.style.background='#32473c'">
                     <i class="ti ti-device-floppy" style="font-size:14px"></i> Registrar Gasto
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Real Bank Balance Modal -->
+<div id="real-balance-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#fff;border-radius:14px;width:100%;max-width:520px;padding:1.6rem;animation:modalFadeIn .2s ease;box-shadow:0 20px 40px -10px rgba(0,0,0,.25)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.3rem">
+            <h3 style="font-size:16px;font-weight:700;color:#0f172a;margin:0;display:flex;align-items:center;gap:8px">
+                <i class="ti ti-wallet" style="color:#0f766e"></i> Actualizar Balance Real
+            </h3>
+            <button type="button" onclick="closeRealBalanceModal()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:0">&times;</button>
+        </div>
+
+        <form id="real-balance-form" method="POST" action="{{ route('finance.updateRealBalance', $project->id_proyect) }}">
+            @csrf
+            <div style="margin-bottom:1rem">
+                <label style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px">Balance real en el banco <span style="color:#ef4444">*</span></label>
+                <div style="position:relative">
+                    <span style="position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-weight:600">S/</span>
+                    <span style="position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-weight:600">{{ $currencySymbol }}</span>
+                    <input type="number" name="real_amount" value="{{ $realBalance ?? 0 }}" required step="0.01" min="0"
+                           placeholder="0.00"
+                           style="width:100%;padding:.6rem .8rem .6rem 2.2rem;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#0f172a;outline:none;transition:border-color .15s;box-sizing:border-box"
+                           onfocus="this.style.borderColor='#0f766e'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:.6rem">
+                <button type="button" onclick="closeRealBalanceModal()" style="padding:.6rem 1.2rem;background:none;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s"
+                        onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'">Cancelar</button>
+                <button type="submit" style="padding:.6rem 1.4rem;background:#0f766e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;display:inline-flex;align-items:center;gap:6px"
+                        onmouseover="this.style.background='#115e59'" onmouseout="this.style.background='#0f766e'">
+                    <i class="ti ti-device-floppy" style="font-size:14px"></i> Guardar
                 </button>
             </div>
         </form>
@@ -1012,6 +1066,9 @@
         document.getElementById('expense-modal').style.display = 'flex';
     }
     function closeExpenseModal() { document.getElementById('expense-modal').style.display = 'none'; }
+
+    function openRealBalanceModal() { document.getElementById('real-balance-modal').style.display = 'flex'; }
+    function closeRealBalanceModal() { document.getElementById('real-balance-modal').style.display = 'none'; }
 
     function openRechargeModal() { document.getElementById('recharge-modal').style.display = 'flex'; }
     function closeRechargeModal() { document.getElementById('recharge-modal').style.display = 'none'; }

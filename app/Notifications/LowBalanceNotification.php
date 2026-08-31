@@ -37,6 +37,7 @@ class LowBalanceNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         $projectName = $this->project->name;
+        $projectCurrency = $this->project->currency ?? 'S/';
         $balance = number_format($this->availableBalance, 2);
         $expenseAmount = number_format($this->expense->amount, 2);
         $personName = $this->expense->name_people ?? 'Usuario no identificado';
@@ -48,6 +49,7 @@ class LowBalanceNotification extends Notification
             ->subject('Alerta: Balance Crítico en ' . $projectName)
             ->view('mails.low-balance', [
                 'projectName' => $projectName,
+                'projectCurrency' => $projectCurrency,
                 'balance' => $balance,
                 'expenseAmount' => $expenseAmount,
                 'personName' => $personName,

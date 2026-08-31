@@ -263,7 +263,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/usuarios/{user}', [UserController::class, 'destroy'])->name('usuarios.destroy');
     });
 
-    Route::prefix('finance')->group(function () {
+   Route::prefix('finance')->group(function () {
 
         Route::get('/', [FinanceController::class, 'index'])->name('finance.index');
         Route::get('/{id}', [FinanceController::class, 'show'])->name('finance.show');
@@ -276,6 +276,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/{id}/expense/{expenseId}', [FinanceController::class, 'updateExpense'])->name('finance.updateExpense');
         Route::delete('/{id}/expense/{expenseId}', [FinanceController::class, 'destroyExpense'])->name('finance.destroyExpense');
 
+        Route::post('/{id}/real-balance', [FinanceController::class, 'updateRealBalance'])->name('finance.updateRealBalance');
         Route::post('/{id}/recharge', [FinanceController::class, 'rechargeBalance'])->name('finance.recharge');
         Route::post('/{id}/initial-balance', [FinanceController::class, 'setInitialBalance'])->name('finance.setInitialBalance');
         Route::get('/{id}/recharge/{rechargeId}/edit', [FinanceController::class, 'editRecharge'])->name('finance.editRecharge');

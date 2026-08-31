@@ -37,19 +37,24 @@ class FinanceController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'currency' => 'required|string|in:S/,$',
         ], [
             'name.required' => 'El nombre del proyecto es obligatorio.',
             'name.max' => 'El nombre no puede tener más de 255 caracteres.',
+            'currency.required' => 'La moneda del proyecto es obligatoria.',
+            'currency.in' => 'La moneda debe ser S/ o $.',
         ]);
 
         DB::beginTransaction();
         try {
             $balance = BalanceModel::create([
                 'amount' => 0,
+                'real_amount' => 0,
             ]);
 
             $project = ProyectModel::create([
                 'name' => $request->name,
+                'currency' => $request->currency,
                 'id_balance' => $balance->id_balance,
             ]);
 
@@ -75,6 +80,8 @@ class FinanceController extends Controller
             ])->findOrFail($id);
 
             $availableBalance = $project->balance ? $project->balance->amount : 0;
+            $realBalance = $project->balance ? $project->balance->real_amount : 0;
+            $currencySymbol = $project->currency_symbol;
             $totalExpenses = $project->expenses->sum('amount');
 
             // ── RECARGAS (paginadas) ──
@@ -122,6 +129,8 @@ class FinanceController extends Controller
                 'totalExpenses',
                 'totalOperationalExpenses',
                 'availableBalance',
+                'realBalance',
+                'currencySymbol',
                 'recharges',
                 'personTypes'
             ));
@@ -185,6 +194,41 @@ class FinanceController extends Controller
         }
     }
 
+    public function updateRealBalance(Request $request, $id)
+    {
+        $request->validate([
+            'real_amount' => 'required|numeric|min:0',
+        ], [
+            'real_amount.required' => 'El balance real del banco es obligatorio.',
+            'real_amount.numeric' => 'El balance real debe ser un número válido.',
+            'real_amount.min' => 'El balance real no puede ser menor a 0.',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $project = ProyectModel::with('balance')->findOrFail($id);
+
+            if (! $project->balance) {
+                return back()->with('error', 'El proyecto no tiene un balance asignado.');
+            }
+
+            $project->balance->update([
+                'real_amount' => $request->real_amount,
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('finance.show', $id)
+                ->with('success', 'Balance real en el banco actualizado correctamente.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return back()->with('error', 'Error al actualizar el balance real: '.$e->getMessage());
+        }
+    }
+
     public function rechargeBalance(Request $request, $id)
     {
         $request->validate([
@@ -243,6 +287,10 @@ class FinanceController extends Controller
 
             $project->balance->recharge($request->amount);
 
+            if ($project->balance->real_amount === null) {
+                $project->balance->update(['real_amount' => 0]);
+            }
+
             DB::commit();
 
             return redirect()->route('finance.show', $id);
@@ -284,10 +332,19 @@ class FinanceController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
+            'currency' => 'required|string|in:S/,$',
+        ], [
+            'name.required' => 'El nombre del proyecto es obligatorio.',
+            'name.max' => 'El nombre no puede tener más de 255 caracteres.',
+            'currency.required' => 'La moneda del proyecto es obligatoria.',
+            'currency.in' => 'La moneda debe ser S/ o $.',
         ]);
 
         $project = ProyectModel::findOrFail($id);
-        $project->update(['name' => $request->name]);
+        $project->update([
+            'name' => $request->name,
+            'currency' => $request->currency,
+        ]);
 
         return redirect()->route('finance.index')
             ->with('success', 'Proyecto actualizado correctamente.');
@@ -295,31 +352,17 @@ class FinanceController extends Controller
 
     public function destroy($id)
     {
-        DB::beginTransaction();
         try {
-            $project = ProyectModel::with('balance', 'expenses')->findOrFail($id);
+            $project = ProyectModel::findOrFail($id);
 
-            // Eliminar gastos asociados
-            if ($project->expenses()->exists()) {
-                \App\Models\Finance\ProjectExpenseModel::where('id_proyect', $id)->delete();
-            }
-
-            // Eliminar recargas asociadas al balance
             if ($project->balance) {
-                \App\Models\Finance\BalanceRecharges::where('id_balance', $project->balance->id_balance)->delete();
-
-                // Eliminar balance
                 $project->balance->delete();
             }
 
-            // Finalmente eliminar el proyecto
             $project->delete();
-
-            DB::commit();
 
             return redirect()->route('finance.index')->with('success', 'Eliminado Correctamente');
         } catch (\Exception $e) {
-            DB::rollBack();
             return redirect()->route('finance.index')
                 ->with('error', 'Error al eliminar el proyecto: '.$e->getMessage());
         }

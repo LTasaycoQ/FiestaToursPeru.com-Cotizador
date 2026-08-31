@@ -9,14 +9,21 @@ class ProyectModel extends Model
     protected $table = 'proyect';
     protected $primaryKey = 'id_proyect';
 
-    protected $fillable = ['id_balance', 'name', 'created_at', 'updated_at'];
+    protected $fillable = ['id_balance', 'name', 'currency', 'created_at', 'updated_at'];
+
+    protected $casts = [
+        'currency' => 'string',
+    ];
+
+    public function getCurrencySymbolAttribute(): string
+    {
+        return $this->currency === '$' ? '$' : 'S/';
+    }
 
     public function balance()
     {
         return $this->belongsTo(BalanceModel::class, 'id_balance', 'id_balance');
     }
-
-   
 
     public function expenses()
     {

@@ -12,10 +12,11 @@ class BalanceModel extends Model
     protected $table = 'balance';
     protected $primaryKey = 'id_balance';
 
-    protected $fillable = ['amount'];
+    protected $fillable = ['amount', 'real_amount'];
 
     protected $casts = [
-        'amount' => 'decimal:2'
+        'amount' => 'decimal:2',
+        'real_amount' => 'decimal:2',
     ];
 
     public function projects(): HasMany
