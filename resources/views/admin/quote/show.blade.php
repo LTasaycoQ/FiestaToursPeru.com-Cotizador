@@ -24,6 +24,12 @@
 .btn-warning { background: #f59e0b; color: #fff; } .btn-warning:hover { background: #d97706; }
 .btn-danger { background: #ef4444; color: #fff; } .btn-danger:hover { background: #dc2626; }
 
+.quote-show-tabs { display:flex; gap:8px; flex-wrap:wrap; margin: 0 0 1.25rem; padding:5px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; }
+.quote-show-tab { border:0; background:transparent; color:#64748b; padding:10px 16px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; }
+.quote-show-tab.active { background:#fff; color:#0f172a; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
+.quote-show-panel { display:none; }
+.quote-show-panel.active { display:block; }
+
 .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
 .info-box { background: #f8fafc; padding: 1rem 1.2rem; border-radius: 10px; border: 1px solid #e2e8f0; }
 .info-box .icon { color: #94a3b8; font-size: 14px; margin-right: 4px; }
@@ -215,6 +221,12 @@
                         <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
                             <i class="ti ti-file-spreadsheet"></i> Excel
                         </a>
+                        <a href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" class="btn btn-secondary" target="_blank">
+                            <i class="ti ti-file-text"></i> PDF
+                        </a>
+                        <a href="{{ route('admin.quotes.export.docx', $quote->id_quote) }}" class="btn btn-secondary" target="_blank">
+                            <i class="ti ti-file-type-doc"></i> DOCX
+                        </a>
                         <a href="{{ route('admin.quotes.edit', $quote->id_quote) }}" class="btn btn-warning">
                             <i class="ti ti-edit"></i> Editar
                         </a>
@@ -249,8 +261,20 @@
                         </div>
                     @endif
 
-                    <!-- ===== INFORMACIÓN GENERAL ===== -->
-                    <div class="info-grid">
+                    <nav class="quote-show-tabs" aria-label="Secciones de la cotización">
+                        <button type="button" class="quote-show-tab active" data-show-tab="information" onclick="switchQuoteShowTab('information')">
+                            <i class="ti ti-info-circle"></i> Información
+                        </button>
+                        <button type="button" class="quote-show-tab" data-show-tab="itinerary" onclick="switchQuoteShowTab('itinerary')">
+                            <i class="ti ti-route"></i> Itinerario
+                        </button>
+                        <button type="button" class="quote-show-tab" data-show-tab="documents" onclick="switchQuoteShowTab('documents')">
+                            <i class="ti ti-file-text"></i> Documentos
+                        </button>
+                    </nav>
+
+                    <div class="quote-show-panel active" id="quote-show-information">
+                        <div class="info-grid">
                       
                         <div class="info-box">
                             <span class="label"><i class="icon ti ti-user"></i> Cliente</span>
@@ -287,17 +311,16 @@
                         </div>
                     </div>
 
-                    @if($quote->notes)
-                        <div class="notes-box">
-                            <span class="label"><i class="ti ti-notes"></i> Observaciones</span>
-                            <p class="text">{{ $quote->notes }}</p>
-                        </div>
-                    @endif
+                        @if($quote->notes)
+                           <div class="notes-box">
+                               <span class="label"><i class="ti ti-notes"></i> Observaciones</span>
+                               <p class="text">{{ $quote->notes }}</p>
+                           </div>
+                        @endif
+                    </div>
 
-                    <!-- ============================================================
-                         ITINERARIO POR DÍAS
-                         ============================================================ -->
-                    <div class="itinerary-block">
+                    <div class="quote-show-panel" id="quote-show-itinerary">
+                        <div class="itinerary-block">
                         <h4 class="section-title">
                             <i class="ti ti-route"></i> Itinerario
                             <span style="font-size:12px; font-weight:400; color:#94a3b8; background:#f1f5f9; padding:2px 10px; border-radius:12px;">
@@ -345,12 +368,12 @@
                                 <p>Aún no se ha definido el itinerario</p>
                             </div>
                         @endforelse
-                    </div>
+                        </div>
 
-                    <!-- ============================================================
-                         HOSPEDAJE POR DÍA (2 OPCIONES)
-                         ============================================================ -->
-                    <div class="accommodation-block">
+                        <!-- ============================================================
+                             HOSPEDAJE POR DÍA (2 OPCIONES)
+                             ============================================================ -->
+                        <div class="accommodation-block">
                         <h4 class="section-title">
                             <i class="ti ti-bed"></i> Hospedaje — 2 opciones
                             <span style="font-size:12px; font-weight:400; color:#94a3b8; background:#f1f5f9; padding:2px 10px; border-radius:12px;">
@@ -481,8 +504,55 @@
                             </div>
                         </div>
                     </div>
-
                 </div>
+
+                <div class="quote-show-panel" id="quote-show-documents">
+                    <div class="documents-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px, 1fr)); gap:16px;">
+                        <div class="card" style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#f8fafc;">
+                            <div class="card-body" style="padding:20px;">
+                                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                    <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-spreadsheet"></i></div>
+                                    <div>
+                                        <div style="font-weight:700;">Excel</div>
+                                        <small style="color:#64748b;">Exportar cotización</small>
+                                    </div>
+                                </div>
+                                <a class="btn btn-secondary" href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}">
+                                    <i class="ti ti-download"></i> Descargar Excel
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card" style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#f8fafc;">
+                            <div class="card-body" style="padding:20px;">
+                                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                    <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-text"></i></div>
+                                    <div>
+                                        <div style="font-weight:700;">PDF</div>
+                                        <small style="color:#64748b;">Vista previa del documento</small>
+                                    </div>
+                                </div>
+                                <a class="btn btn-secondary" href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" target="_blank">
+                                    <i class="ti ti-eye"></i> Ver PDF
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card" style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#f8fafc;">
+                            <div class="card-body" style="padding:20px;">
+                                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                    <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-type-doc"></i></div>
+                                    <div>
+                                        <div style="font-weight:700;">DOCX</div>
+                                        <small style="color:#64748b;">Itinerario para Google Docs</small>
+                                    </div>
+                                </div>
+                                <a class="btn btn-secondary" href="{{ route('admin.quotes.export.docx', $quote->id_quote) }}" target="_blank">
+                                    <i class="ti ti-download"></i> Descargar DOCX
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </div>
@@ -490,4 +560,15 @@
 </div>
 
 
+<script>
+    function switchQuoteShowTab(tab) {
+        document.querySelectorAll('.quote-show-tab').forEach((button) => {
+            button.classList.toggle('active', button.dataset.showTab === tab);
+        });
+
+        document.querySelectorAll('.quote-show-panel').forEach((panel) => {
+            panel.classList.toggle('active', panel.id === `quote-show-${tab}`);
+        });
+    }
+</script>
 @endsection

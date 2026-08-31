@@ -177,6 +177,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/{quote}', [QuoteController::class, 'show'])->name('show');
         Route::get('/{quote}/editar', [QuoteController::class, 'edit'])->name('edit');
         Route::get('/{quote}/exportar/excel', [QuoteController::class, 'exportExcel'])->name('export.excel');
+        Route::get('/{quote}/exportar/pdf', [QuoteController::class, 'exportPdf'])->name('export.pdf');
+        Route::get('/{quote}/exportar/docx', [QuoteController::class, 'exportDocx'])->name('export.docx');
         Route::put('/{quote}', [QuoteController::class, 'update'])->name('update');
         Route::post('/{quote}/cotizar', [QuoteController::class, 'quote'])->name('quote');
         Route::delete('/{quote}', [QuoteController::class, 'destroy'])->name('destroy');

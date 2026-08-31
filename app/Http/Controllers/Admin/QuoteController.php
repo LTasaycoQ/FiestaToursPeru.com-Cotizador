@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\QuoteDocxExport;
 use App\Exports\QuoteExport;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -17,6 +18,7 @@ use App\Models\Service;
 use App\Models\Supplier;
 use App\Models\Tariff;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -321,6 +323,43 @@ class QuoteController extends Controller
     public function exportExcel(Quote $quote)
     {
         return Excel::download(new QuoteExport($quote->id_quote), 'cotizacion-'.$quote->id_quote.'.xlsx');
+    }
+
+    public function exportPdf(Quote $quote)
+    {
+        $quote->load([
+            'client',
+            'contact',
+            'user',
+            'quoteDays.details.service',
+            'quoteDays.details.supplier',
+            'quoteDays.details.tariff.subCategory',
+            'accommodations.service',
+            'accommodations.supplier',
+            'accommodations.tariff.subCategory',
+            'accommodations.quoteDay',
+        ]);
+
+        $totals = $quote->getTotalsByOption();
+        $quoteDays = $quote->quoteDays()->orderBy('day_number')->with('details.service')->get();
+        $option1Hotels = $quote->accommodationOption1()->with(['quoteDay', 'service', 'supplier', 'tariff.subCategory'])->get();
+        $option2Hotels = $quote->accommodationOption2()->with(['quoteDay', 'service', 'supplier', 'tariff.subCategory'])->get();
+
+        $pdf = Pdf::loadView('admin.quote.export-pdf', compact(
+            'quote',
+            'quoteDays',
+            'totals',
+            'option1Hotels',
+            'option2Hotels',
+        ))
+            ->setPaper('A4', 'portrait');
+
+        return $pdf->stream('cotizacion-'.$quote->id_quote.'.pdf');
+    }
+
+    public function exportDocx(Quote $quote)
+    {
+        return (new QuoteDocxExport($quote->id_quote))->download();
     }
 
     public function update(Request $request, Quote $quote)

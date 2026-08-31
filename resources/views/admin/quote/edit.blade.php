@@ -303,6 +303,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
                             <i class="ti ti-file-spreadsheet"></i> Excel
                         </a>
+                        <a href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" class="btn btn-secondary" target="_blank">
+                            <i class="ti ti-file-text"></i> PDF
+                        </a>
                         <button class="btn btn-danger" onclick="confirmDelete({{ $quote->id_quote }}, '{{ addslashes($quote->name ?? 'Cotización') }}')">
                             <i class="ti ti-trash"></i> Eliminar
                         </button>
@@ -349,6 +352,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         </button>
                         <button type="button" class="quote-main-tab active" data-quote-tab="itinerary" onclick="switchQuoteTab('itinerary')">
                             <i class="ti ti-route"></i> Itinerario
+                        </button>
+                        <button type="button" class="quote-main-tab" data-quote-tab="documents" onclick="switchQuoteTab('documents')">
+                            <i class="ti ti-file-text"></i> Documentos
                         </button>
                     </nav>
 
@@ -450,6 +456,56 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <button type="button" class="btn btn-primary" onclick="document.getElementById('quotePricingModal').style.display='flex'">
                             <i class="ti ti-calculator"></i> Cotizar
                         </button>
+                    </div>
+
+                    <div class="quote-main-panel" id="quote-tab-documents">
+                        <div class="field-section">
+                            <div class="field-section__label"><i class="ti ti-file-text"></i> Documentos</div>
+                            <div class="documents-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px, 1fr)); gap:16px;">
+                                <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
+                                    <div class="qe-card-body" style="padding:20px;">
+                                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                            <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-spreadsheet"></i></div>
+                                            <div>
+                                                <div style="font-weight:700;">Excel</div>
+                                                <small style="color:var(--qe-ink-500);">Exportar plantilla de cotización</small>
+                                            </div>
+                                        </div>
+                                        <a class="btn btn-primary" href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}">
+                                            <i class="ti ti-download"></i> Descargar Excel
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
+                                    <div class="qe-card-body" style="padding:20px;">
+                                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                            <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-text"></i></div>
+                                            <div>
+                                                <div style="font-weight:700;">PDF</div>
+                                                <small style="color:var(--qe-ink-500);">Vista previa y exportación</small>
+                                            </div>
+                                        </div>
+                                        <a class="btn btn-secondary" href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" target="_blank">
+                                            <i class="ti ti-eye"></i> Ver PDF
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="qe-card" style="border:1px solid var(--qe-line); border-radius:var(--qe-radius-lg); background:var(--qe-surface-muted);">
+                                    <div class="qe-card-body" style="padding:20px;">
+                                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                                            <div class="qe-header-icon" style="width:36px; height:36px; font-size:16px;"><i class="ti ti-file-type-doc"></i></div>
+                                            <div>
+                                                <div style="font-weight:700;">DOCX</div>
+                                                <small style="color:var(--qe-ink-500);">Itinerario listo para Google Docs</small>
+                                            </div>
+                                        </div>
+                                        <a class="btn btn-secondary" href="{{ route('admin.quotes.export.docx', $quote->id_quote) }}" target="_blank">
+                                            <i class="ti ti-download"></i> Descargar DOCX
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="quotePricingModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:9999; align-items:center; justify-content:center; padding:20px;">
@@ -659,8 +715,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 Define fechas de inicio y fin arriba y guarda para generar el itinerario
                             </div>
                         @endif
-                    </div>
 
+
+                        
                     <div class="accommodation-section">
                         <div class="itinerary-header">
                             <h4 class="title">
@@ -833,7 +890,6 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 @endif
                             </div>
 
-                            <!-- OPCIÓN 2 -->
                             <div class="accommodation-option {{ $quote->accommodationOption2->count() > 0 ? 'has-hotel' : '' }}" id="accOption2">
                                 <div class="option-label"><i class="ti ti-number-2"></i> Opción 2</div>
                                 @php $hotelsOption2 = $quote->accommodationOption2->sortBy('quoteDay.day_number'); @endphp
@@ -959,6 +1015,8 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 @endif
                             </div>
                         </div>
+                    </div>
+
                     </div>
 
                 </div>
