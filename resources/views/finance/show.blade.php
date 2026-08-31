@@ -213,28 +213,28 @@
         <a href="{{ route('finance.index') }}" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:6px">
             <i class="ti ti-arrow-left" style="font-size:15px"></i> Volver
         </a>
-          @php $user = auth()->user(); @endphp
+        @php $user = auth()->user(); @endphp
+        @if($user->isAdmin() || $user->email === 'administracion1@fiestatoursperu.com')
 
-        @if(($project->balance->amount ?? 0) == 0)
-            <button onclick="openSetInitialBalanceModal()" 
-                    style="padding:.5rem 1.2rem;background: #6a1d24;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                <i class="ti ti-plus"></i> Asignar Balance Inicial
-            </button>
-        @else
-            @if($user->isAdmin() || $user->email === 'administracion1@fiestatoursperu.com')
-                <button onclick="openRechargeModal()" 
-                        style="padding:.5rem 1.2rem;background: #2e453d;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                    <i class="ti ti-plus-circle"></i> Recargar Balance
+            @if(($project->balance->amount ?? 0) == 0)
+                <button onclick="openSetInitialBalanceModal()" 
+                        style="padding:.5rem 1.2rem;background: #6a1d24;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    <i class="ti ti-plus"></i> Asignar Balance Inicial
                 </button>
-
-                <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-                    <a href="{{ route('finance.export.all', $project->id_proyect) }}" class="btn-export" style="background:#1a5c38;">
-                        <i class="ti ti-file-excel"></i> Exportar Todos
-                    </a>
-                
-                </div>
+            @else
+                    <button onclick="openRechargeModal()" 
+                            style="padding:.5rem 1.2rem;background: #2e453d;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                        <i class="ti ti-plus-circle"></i> Recargar Balance
+                    </button>
+    
+                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                        <a href="{{ route('finance.export.all', $project->id_proyect) }}" class="btn-export" style="background:#1a5c38;">
+                            <i class="ti ti-file-excel"></i> Exportar Todos
+                        </a>
+                    
+                    </div>
+    Q
             @endif
-Q
         @endif
     </div>
 </div>
@@ -258,7 +258,6 @@ Q
             </button>
         @endif
     </div>
-    
 </div>
 
 <div class="tab-container" style="display:flex; justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
