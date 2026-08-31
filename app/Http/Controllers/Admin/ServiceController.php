@@ -11,6 +11,7 @@ use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\ServiceDescription;
 use App\Models\SubCategory;
+use App\Models\ServiceImage;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -211,39 +212,86 @@ class ServiceController extends Controller
 
     public function updateImage(Request $request, Service $service)
     {
-        $validated = $request->validate([
-            'imagen' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'delete_imagen' => ['nullable', 'boolean'],
-        ]);
+        if ($request->filled('delete_image_id')) {
+            $image = $service->images()->find($request->input('delete_image_id'));
 
-        if (($validated['delete_imagen'] ?? false) === true) {
-            if ($service->imagen && Storage::disk('public')->exists($service->imagen)) {
-                Storage::disk('public')->delete($service->imagen);
+            if ($image) {
+                if (Storage::disk('public')->exists($image->image_path)) {
+                    Storage::disk('public')->delete($image->image_path);
+                }
+
+                $image->delete();
+
+                if (! $service->images()->where('is_principal', true)->exists()) {
+                    $firstImage = $service->images()->first();
+                    if ($firstImage) {
+                        $firstImage->update(['is_principal' => true]);
+                    }
+                }
             }
-
-            $service->update(['imagen' => null]);
 
             return redirect()
                 ->route('admin.tariffs.index', $service->id_service)
                 ->with('success', 'Imagen eliminada correctamente.');
         }
 
-        if (! $request->hasFile('imagen')) {
+        if ($request->filled('delete_image_ids') && is_array($request->input('delete_image_ids'))) {
+            foreach ($request->input('delete_image_ids') as $imageId) {
+                $image = $service->images()->find($imageId);
+                if (! $image) {
+                    continue;
+                }
+
+                if (Storage::disk('public')->exists($image->image_path)) {
+                    Storage::disk('public')->delete($image->image_path);
+                }
+
+                $image->delete();
+            }
+
+            if (! $service->images()->where('is_principal', true)->exists()) {
+                $firstImage = $service->images()->first();
+                if ($firstImage) {
+                    $firstImage->update(['is_principal' => true]);
+                }
+            }
+
             return redirect()
                 ->route('admin.tariffs.index', $service->id_service)
-                ->with('error', 'Selecciona una imagen válida para continuar.');
+                ->with('success', 'Imágenes eliminadas correctamente.');
         }
 
-        if ($service->imagen && Storage::disk('public')->exists($service->imagen)) {
-            Storage::disk('public')->delete($service->imagen);
+        $request->validate([
+            'images' => ['nullable', 'array'],
+            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        ]);
+
+        if (! $request->hasFile('images')) {
+            return redirect()
+                ->route('admin.tariffs.index', $service->id_service)
+                ->with('error', 'Selecciona una o más imágenes válidas para continuar.');
         }
 
-        $path = $request->file('imagen')->store('services/'.$service->id_service, 'public');
-        $service->update(['imagen' => $path]);
+        $uploaded = 0;
+        foreach ($request->file('images') as $image) {
+            $path = $image->store('services/' . $service->id_service, 'public');
+
+            $serviceImage = ServiceImage::create([
+                'id_service' => $service->id_service,
+                'image_path' => $path,
+                'is_principal' => ! $service->images()->where('is_principal', true)->exists() && $uploaded === 0,
+            ]);
+
+            $uploaded++;
+
+            if (! $service->images()->where('is_principal', true)->exists()) {
+                $serviceImage->update(['is_principal' => true]);
+            }
+        }
 
         return redirect()
             ->route('admin.tariffs.index', $service->id_service)
-            ->with('success', 'Imagen del servicio actualizada correctamente.');
+            ->with('success', $uploaded . ' imagen(es) agregada(s) correctamente.');
     }
 
     public function destroy($id)

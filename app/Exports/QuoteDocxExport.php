@@ -62,12 +62,28 @@ class QuoteDocxExport
                 $section->addText($serviceName, ['bold' => true, 'size' => 12]);
 
                 $description = $this->extractDescription($detail->service, $quote->id_language);
-                if (trim((string) $description) === '') {
-                    $section->addText('');
-                    continue;
+                if (trim((string) $description) !== '') {
+                    $section->addText($description);
                 }
 
-                $section->addText($description);
+                $principalImage = $detail->service?->principalImage()->first();
+                $imagePath = $principalImage?->image_path ?? ($detail->service?->imagen ? $detail->service->imagen : null);
+
+                if ($imagePath) {
+                    $absoluteImagePath = Storage::disk('public')->path($imagePath);
+                    if (file_exists($absoluteImagePath)) {
+                        $section->addImage($absoluteImagePath, [
+                            'width' => 180,
+                            'height' => 120,
+                            'wrappingStyle' => 'square',
+                            'position' => 'relative',
+                        ]);
+                    }
+                }
+
+                if (trim((string) $description) === '') {
+                    $section->addText('');
+                }
             }
 
             $section->addTextBreak();

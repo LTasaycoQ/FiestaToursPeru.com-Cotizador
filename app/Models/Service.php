@@ -55,6 +55,18 @@ class Service extends Model
         return $this->hasMany(ServiceDescription::class, 'id_service', 'id_service');
     }
 
+    public function images(): HasMany
+    {
+        return $this->hasMany(ServiceImage::class, 'id_service', 'id_service')
+            ->orderBy('created_at', 'desc');
+    }
+
+    public function principalImage()
+    {
+        return $this->hasOne(ServiceImage::class, 'id_service', 'id_service')
+            ->where('is_principal', true);
+    }
+
     // ============================================================
     // ACCESORS
     // ============================================================
@@ -91,6 +103,21 @@ class Service extends Model
     public function getSupplierNameAttribute()
     {
         return $this->supplier?->supplier_name ?? 'Proveedor eliminado';
+    }
+
+    public function getPrincipalImageUrlAttribute(): string
+    {
+        $image = $this->principalImage()->first();
+
+        if ($image) {
+            return asset('storage/' . $image->image_path);
+        }
+
+        if ($this->imagen) {
+            return asset('storage/' . $this->imagen);
+        }
+
+        return asset('images/default-supplier.png');
     }
 
     // ============================================================

@@ -187,6 +187,330 @@
         overflow: hidden;
     }
 
+    .gallery-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .gallery-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .gallery-header h4 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .gallery-counter {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .gallery-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .gallery-item {
+        position: relative;
+        border: 1px solid #dbe3ef;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+        min-height: 130px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        flex: 1 1 180px;
+        max-width: calc(25% - 9px);
+        min-width: 180px;
+    }
+
+    .gallery-item:hover {
+        transform: translateY(-1px);
+        border-color: #cbd5e1;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    .gallery-item .gallery-img {
+        width: 100%;
+        height: 130px;
+        object-fit: cover;
+        display: block;
+        cursor: pointer;
+    }
+
+    .gallery-item .gallery-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.38);
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .gallery-item:hover .gallery-overlay {
+        opacity: 1;
+    }
+
+    .gallery-view {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+        color: #fff;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        backdrop-filter: blur(2px);
+    }
+
+    .gallery-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-gallery-action {
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .btn-gallery-action:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: scale(1.05);
+    }
+
+    .gallery-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 180px;
+        border: 1px dashed #dbe3ef;
+        border-radius: 12px;
+        background: #fff;
+        color: #94a3b8;
+        text-align: center;
+        padding: 1.5rem;
+    }
+
+    .gallery-empty-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .gallery-empty i {
+        font-size: 36px;
+        color: #cbd5e1;
+    }
+
+    .gallery-empty p {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .gallery-empty span {
+        font-size: 13px;
+        color: #94a3b8;
+    }
+
+    .btn-upload-image {
+        background: #0f172a;
+        border: none;
+        color: #fff;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+    }
+
+    .btn-upload-image:hover {
+        background: #1e293b;
+    }
+
+    .image-lightbox {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.8);
+        backdrop-filter: blur(6px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        padding: 2rem;
+    }
+
+    .image-lightbox.show {
+        display: flex;
+    }
+
+    .image-lightbox .lightbox-content {
+        position: relative;
+        max-width: 90vw;
+        max-height: 82vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .image-lightbox .lightbox-content img {
+        max-width: 100%;
+        max-height: 82vh;
+        border-radius: 10px;
+        box-shadow: 0 25px 80px rgba(15, 23, 42, 0.35);
+        background: #fff;
+    }
+
+    .image-lightbox .close-lightbox {
+        position: absolute;
+        top: 22px;
+        right: 22px;
+        background: rgba(255, 255, 255, 0.08);
+        border: none;
+        color: #fff;
+        font-size: 28px;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+
+    .image-lightbox .close-lightbox:hover {
+        opacity: 1;
+    }
+
+    .image-lightbox .nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.08);
+        border: none;
+        color: #fff;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        font-size: 24px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.72;
+        backdrop-filter: blur(2px);
+    }
+
+    .image-lightbox .nav-btn:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.18);
+    }
+
+    .image-lightbox .nav-btn.prev {
+        left: 18px;
+    }
+
+    .image-lightbox .nav-btn.next {
+        right: 18px;
+    }
+
+    .image-lightbox .counter {
+        position: absolute;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 13px;
+    }
+
+    .preview-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .preview-item {
+        position: relative;
+        width: 76px;
+        height: 76px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 2px solid #e2e8f0;
+        background: #fff;
+    }
+
+    .preview-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .preview-remove {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(15, 23, 42, 0.8);
+        color: #fff;
+        font-size: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+        .gallery-item {
+            flex: 1 1 140px;
+            max-width: calc(50% - 6px);
+            min-width: 140px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .gallery-item {
+            flex: 1 1 100%;
+            max-width: 100%;
+            min-width: 100%;
+        }
+    }
+
     .tariff-content-nav {
         display: flex;
         gap: 8px;
@@ -874,29 +1198,12 @@
 
             <div style="display:grid;grid-template-columns:1.1fr 1.9fr;gap:24px;align-items:start;">
                 <div>
-                    <div style="font-weight:700;color:#0f172a;margin-bottom:10px;">Imagen del servicio</div>
-                    <form method="POST" action="{{ route('admin.services.image.update', $service->id_service) }}" enctype="multipart/form-data">
-                        @csrf
-                        <div style="border:1px dashed #cbd5e1;border-radius:12px;padding:14px;background:#f8fafc;text-align:center;">
-                            @if($service->imagen)
-                                <img src="{{ asset('storage/' . $service->imagen) }}" alt="{{ $service->name_service }}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block;">
-                            @else
-                                <div style="display:flex;align-items:center;justify-content:center;height:180px;border:1px dashed #dbe3ef;border-radius:10px;background:#fff;color:#94a3b8;font-size:14px;">
-                                    <span>Sin imagen</span>
-                                </div>
-                            @endif
-                            <input type="file" name="imagen" accept="image/*" style="width:100%;margin-top:12px;">
-                            <small style="display:block;color:#64748b;margin-top:8px;">Formatos permitidos: JPG, PNG, WEBP. Máximo 2 MB.</small>
+                    <div style="border:1px dashed #dbe3ef;border-radius:12px;padding:16px;background:#f8fafc;min-height:180px;display:flex;flex-direction:column;justify-content:center;gap:12px;">
+                        <div style="font-weight:700;color:#0f172a;">Idioma y descripción</div>
+                        <div style="font-size:13px;color:#64748b;line-height:1.6;">
+                            Asigna el idioma del servicio y escribe la descripción que se usará en la cotización.
                         </div>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-                            <button type="submit" class="btn btn-primary"><i class="ti ti-upload"></i> Guardar imagen</button>
-                            @if($service->imagen)
-                                <button type="submit" name="delete_imagen" value="1" class="btn btn-secondary" onclick="return confirm('¿Deseas eliminar la imagen actual del servicio?')">
-                                    <i class="ti ti-trash"></i> Eliminar
-                                </button>
-                            @endif
-                        </div>
-                    </form>
+                    </div>
                 </div>
 
                 <div>
@@ -914,6 +1221,90 @@
                     </form>
                 </div>
             </div>
+
+            @php
+                $galleryImages = $service->images()->orderBy('created_at', 'desc')->get();
+                if ($galleryImages->isEmpty() && $service->imagen) {
+                    $galleryImages = collect([(object) ['id_service_image' => null, 'image_path' => $service->imagen, 'url' => asset('storage/' . $service->imagen)]]);
+                }
+            @endphp
+
+            <div class="gallery-panel" style="margin-top:24px;">
+                <div class="gallery-header">
+                    <h4><i class="ti ti-photo"></i> Galería cargada <span class="gallery-counter">{{ $galleryImages->count() }}</span></h4>
+                    <button type="button" class="btn-upload-image" onclick="openServiceImageModal()">
+                        <i class="ti ti-plus"></i> Añadir imágenes
+                    </button>
+                </div>
+
+                @if($galleryImages->isNotEmpty())
+                    <div class="gallery-grid">
+                        @foreach($galleryImages as $galleryImage)
+                            @php
+                                $imageSource = $galleryImage->url ?? asset('storage/' . $galleryImage->image_path);
+                            @endphp
+                            <div class="gallery-item">
+                                <img src="{{ $imageSource }}" alt="Imagen del servicio" class="gallery-img" data-gallery-src="{{ $imageSource }}" loading="lazy" onclick="openServiceImageLightbox(this.closest('.gallery-item'))">
+                                <div class="gallery-overlay">
+                                    <span class="gallery-view" onclick="event.stopPropagation(); openServiceImageLightbox(this.closest('.gallery-item'))">Ver</span>
+                                    <div class="gallery-actions">
+                                        @if(!empty($galleryImage->id_service_image))
+                                            <form method="POST" action="{{ route('admin.services.image.update', $service->id_service) }}" onsubmit="return confirm('¿Deseas eliminar esta imagen?');" style="display:inline;">
+                                                @csrf
+                                                <input type="hidden" name="delete_image_id" value="{{ $galleryImage->id_service_image }}">
+                                                <button type="submit" class="btn-gallery-action" title="Eliminar imagen">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="image-lightbox" id="serviceImageLightbox" onclick="closeServiceImageLightbox(event)">
+                        <button type="button" class="close-lightbox" onclick="closeServiceImageLightbox()">✕</button>
+                        <button type="button" class="nav-btn prev" onclick="event.stopPropagation(); navigateServiceImageLightbox(-1)">‹</button>
+                        <div class="lightbox-content" onclick="event.stopPropagation()">
+                            <img id="serviceLightboxImage" src="" alt="Imagen ampliada">
+                        </div>
+                        <button type="button" class="nav-btn next" onclick="event.stopPropagation(); navigateServiceImageLightbox(1)">›</button>
+                        <div class="counter" id="serviceLightboxCounter">1 / {{ $galleryImages->count() }}</div>
+                    </div>
+                @else
+                    <div class="gallery-empty">
+                        <div class="gallery-empty-inner">
+                            <i class="ti ti-photo-off"></i>
+                            <p>Sin imágenes</p>
+                            <span>Aún no hay fotos asociadas a este servicio</span>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="uploadServiceImageModal">
+        <div class="modal-box">
+            <button type="button" class="modal-close-btn" onclick="closeServiceImageModal()">×</button>
+            <h3>Subir imágenes del servicio</h3>
+            <div class="modal-sub">Puedes seleccionar varias fotos para esta tarifa/servicio.</div>
+
+            <form id="uploadServiceImageForm" action="{{ route('admin.services.image.update', $service->id_service) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="form-group">
+                    <label for="serviceImagesInput">Imágenes</label>
+                    <input type="file" name="images[]" id="serviceImagesInput" accept="image/*" multiple required>
+                    <div id="serviceUploadPreview" class="preview-grid"></div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">
+                        <i class="ti ti-cloud-upload"></i> Guardar imágenes
+                    </button>
+                    <button type="button" class="btn-cancel" onclick="closeServiceImageModal()">Cancelar</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1186,6 +1577,9 @@ function loadServiceDescription() {
 }
 
 document.getElementById('serviceLanguage')?.addEventListener('change', loadServiceDescription);
+document.getElementById('serviceImagesInput')?.addEventListener('change', function () {
+    renderServiceUploadPreview(this);
+});
 document.querySelectorAll('[data-tariff-tab]').forEach((button) => {
     button.addEventListener('click', () => {
         document.querySelectorAll('[data-tariff-tab]').forEach((item) => item.classList.remove('active'));
@@ -1212,6 +1606,91 @@ const Toast = Swal.mixin({
         toast.onmouseleave = Swal.resumeTimer;
     }
 });
+
+function openServiceImageModal() {
+    const modal = document.getElementById('uploadServiceImageModal');
+    if (!modal) return;
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    const input = document.getElementById('serviceImagesInput');
+    if (input) {
+        input.value = '';
+        document.getElementById('serviceUploadPreview').innerHTML = '';
+    }
+}
+
+function closeServiceImageModal() {
+    const modal = document.getElementById('uploadServiceImageModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+function openServiceImageLightbox(item) {
+    const lightbox = document.getElementById('serviceImageLightbox');
+    if (!lightbox) return;
+
+    const galleryItems = Array.from(document.querySelectorAll('.gallery-item'));
+    const index = galleryItems.indexOf(item);
+    if (index === -1) return;
+
+    const images = galleryItems.map((galleryItem) => galleryItem.querySelector('.gallery-img')?.dataset?.gallerySrc || galleryItem.querySelector('.gallery-img')?.src);
+    const image = document.getElementById('serviceLightboxImage');
+    const counter = document.getElementById('serviceLightboxCounter');
+
+    window.currentServiceLightboxIndex = index;
+    window.currentServiceLightboxImages = images;
+    image.src = images[index];
+    counter.textContent = `${index + 1} / ${images.length}`;
+    lightbox.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeServiceImageLightbox(event) {
+    const lightbox = document.getElementById('serviceImageLightbox');
+    if (!lightbox) return;
+    if (event && event.target !== lightbox && !event.target.closest('.close-lightbox') && !event.target.closest('.nav-btn')) {
+        return;
+    }
+    lightbox.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+function navigateServiceImageLightbox(direction) {
+    const images = window.currentServiceLightboxImages || [];
+    if (!images.length) return;
+
+    let currentIndex = Number(window.currentServiceLightboxIndex ?? 0);
+    currentIndex = (currentIndex + direction + images.length) % images.length;
+    const image = document.getElementById('serviceLightboxImage');
+    const counter = document.getElementById('serviceLightboxCounter');
+
+    window.currentServiceLightboxIndex = currentIndex;
+    image.src = images[currentIndex];
+    counter.textContent = `${currentIndex + 1} / ${images.length}`;
+}
+
+function renderServiceUploadPreview(input) {
+    const preview = document.getElementById('serviceUploadPreview');
+    if (!preview) return;
+    preview.innerHTML = '';
+
+    Array.from(input.files || []).forEach((file) => {
+        if (!file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const item = document.createElement('div');
+            item.className = 'preview-item';
+            item.innerHTML = `
+                <img src="${event.target.result}" alt="Vista previa">
+                <button type="button" class="preview-remove" onclick="this.parentElement.remove()">×</button>
+            `;
+            preview.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 function openCreateTariffModal() {
     document.getElementById('createTariffModal').classList.add('show');
@@ -1457,6 +1936,8 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeCreateTariffModal();
         closeCreateSubcategoryModal();
+        closeServiceImageModal();
+        closeServiceImageLightbox();
     }
 });
 
@@ -1466,6 +1947,10 @@ document.getElementById('createTariffModal').addEventListener('click', function(
 
 document.getElementById('createSubcategoryModal').addEventListener('click', function(e) {
     if (e.target === this) closeCreateSubcategoryModal();
+});
+
+document.getElementById('uploadServiceImageModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeServiceImageModal();
 });
 </script>
 @endsection
