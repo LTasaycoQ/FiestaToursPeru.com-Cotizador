@@ -617,13 +617,20 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             <div class="day-tabs" id="dayTabs">
                                 @foreach($quote->quoteDays as $index => $day)
                                     <button type="button" class="day-tab {{ $index === 0 ? 'active' : '' }}" data-day-panel="day-panel-{{ $day->id_quote_day }}" onclick="switchDayTab(this)">
-                                        <span>Día {{ $day->day_number }}</span>
+                                        <span>{{ $day->name ?: 'Día '.$day->day_number }}</span>
                                     </button>
                                 @endforeach
                             </div>
-
+ 
                             @foreach($quote->quoteDays as $index => $day)
                                 <div class="day-panel {{ $index === 0 ? 'active' : '' }}" id="day-panel-{{ $day->id_quote_day }}">
+                                    <div class="day-name-editor" style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+                                        <label for="day-name-{{ $day->id_quote_day }}" style="margin:0; font-size:12px; font-weight:700; color:var(--qe-ink-500); text-transform:uppercase; letter-spacing:.04em;">Nombre del día</label>
+                                        <input type="text" id="day-name-{{ $day->id_quote_day }}" class="form-control" value="{{ $day->name ?? '' }}" placeholder="Ej: Llegada / Alojamiento" style="max-width:320px;">
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="saveDayName({{ $day->id_quote_day }})">
+                                            <i class="ti ti-device-floppy"></i> Guardar
+                                        </button>
+                                    </div>
                                     <div class="bulk-delete-bar" data-bulk-bar="day-panel-{{ $day->id_quote_day }}" style="display:none; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; padding:10px 12px; border:1px solid var(--qe-line); border-radius:10px; background:#f8fafc;">
                                         <label style="display:flex; align-items:center; gap:8px; margin:0; font-weight:600; color:var(--qe-ink-500);">
                                             <input type="checkbox" class="bulk-select-all" data-day-panel="day-panel-{{ $day->id_quote_day }}">
@@ -703,6 +710,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     @else
                                                         <span class="service-price" id="detail-subtotal-{{ $detail->id_detail_quote }}" style="color: var(--qe-ink-400); font-style: italic;">Por cotizar</span>
                                                     @endif
+                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openServiceNotes({{ $detail->id_detail_quote }}, '{{ addslashes($detail->notes ?? '') }}')" title="Agregar nota al servicio">
+                                                        <i class="ti ti-note"></i> Nota
+                                                    </button>
                                                     <button type="button" class="btn btn-danger btn-icon btn-sm" onclick="removeService({{ $detail->id_detail_quote }})" title="Eliminar">
                                                         <i class="ti ti-trash"></i>
                                                     </button>
@@ -1347,6 +1357,7 @@ const CSRF_TOKEN = '{{ csrf_token() }}';
 const CONTACT_STORE_URL = '{{ route("admin.contacts.store") }}';
 const ADD_SERVICE_URL = '{{ route("admin.quotes.add-service", $quote->id_quote) }}';
 const UPDATE_SERVICE_URL_BASE = '{{ route("admin.quotes.update-service", [$quote->id_quote, "__ID__"]) }}';
+const UPDATE_DAY_URL_BASE = '{{ route("admin.quotes.update-day", [$quote->id_quote, "__ID__"]) }}';
 const REMOVE_SERVICE_URL_BASE = '{{ route("admin.quotes.remove-service", [$quote->id_quote, "__ID__"]) }}';
 const ADD_ACCOMMODATION_TO_DAY_URL = '{{ route("admin.quotes.add-accommodation-to-day", $quote->id_quote) }}';
 const REMOVE_ACCOMMODATION_URL_BASE = '{{ route("admin.quotes.remove-accommodation", [$quote->id_quote, "__ID__"]) }}';
@@ -1420,6 +1431,92 @@ function switchDayTab(tabEl) {
     document.querySelectorAll('.day-panel').forEach(p => p.classList.remove('active'));
     tabEl.classList.add('active');
     document.getElementById(tabEl.dataset.dayPanel).classList.add('active');
+}
+
+function saveDayName(dayId) {
+    const input = document.getElementById(`day-name-${dayId}`);
+    const name = input ? input.value.trim() : '';
+    const url = UPDATE_DAY_URL_BASE.replace('__ID__', dayId);
+
+    const formData = new FormData();
+    formData.append('_token', CSRF_TOKEN);
+    formData.append('_method', 'PUT');
+    formData.append('name', name);
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
+        body: formData
+    })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok || !data.success) {
+                throw new Error(data.message || 'No se pudo guardar el nombre del día.');
+            }
+
+            const tabButton = document.querySelector(`.day-tab[data-day-panel="day-panel-${dayId}"] span`);
+            if (tabButton) {
+                tabButton.textContent = data.label || 'Día ' + dayId;
+            }
+
+            Swal.fire({ icon: 'success', title: 'Nombre guardado', timer: 1000, showConfirmButton: false });
+        })
+        .catch(error => {
+            Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+        });
+}
+
+function openServiceNotes(detailId, currentNotes = '') {
+    Swal.fire({
+        title: 'Nota del servicio',
+        input: 'textarea',
+        inputLabel: 'Agrega una nota para este servicio',
+        inputValue: currentNotes,
+        inputAttributes: { maxlength: 600 },
+        showCancelButton: true,
+        confirmButtonText: 'Guardar nota',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#6366f1',
+        inputValidator: (value) => {
+            if (value !== null && value.length > 600) {
+                return 'La nota no puede exceder 600 caracteres.';
+            }
+            return null;
+        }
+    }).then((result) => {
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        const noteValue = result.value ?? '';
+        const formData = new FormData();
+        formData.append('_token', CSRF_TOKEN);
+        formData.append('_method', 'PUT');
+        formData.append('notes', noteValue);
+
+        fetch(UPDATE_SERVICE_URL_BASE.replace('__ID__', detailId), {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
+            body: formData
+        })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data.success) {
+                    throw new Error(data.message || 'No se pudo guardar la nota.');
+                }
+
+                const roomMetaNode = document.querySelector(`#detail-${detailId} .service-info small`);
+                if (roomMetaNode) {
+                    roomMetaNode.textContent = noteValue.trim() || '';
+                    roomMetaNode.style.display = noteValue.trim() ? 'block' : 'none';
+                }
+
+                Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false });
+            })
+            .catch(error => {
+                Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+            });
+    });
 }
 
 function syncDetailPrice(detailId) {

@@ -16,6 +16,7 @@ class DetailQuote extends Model
         'id_tariff',
         'id_supplier',
         'quantity',
+        'notes',
         'unit_price',
         'subtotal',
     ];

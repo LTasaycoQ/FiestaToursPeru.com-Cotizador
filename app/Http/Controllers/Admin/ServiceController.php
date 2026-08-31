@@ -14,6 +14,7 @@ use App\Models\SubCategory;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ServiceController extends Controller
@@ -206,6 +207,43 @@ class ServiceController extends Controller
         return redirect()
             ->route('admin.tariffs.index', $service->id_service)
             ->with('success', 'Descripción guardada correctamente.');
+    }
+
+    public function updateImage(Request $request, Service $service)
+    {
+        $validated = $request->validate([
+            'imagen' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'delete_imagen' => ['nullable', 'boolean'],
+        ]);
+
+        if (($validated['delete_imagen'] ?? false) === true) {
+            if ($service->imagen && Storage::disk('public')->exists($service->imagen)) {
+                Storage::disk('public')->delete($service->imagen);
+            }
+
+            $service->update(['imagen' => null]);
+
+            return redirect()
+                ->route('admin.tariffs.index', $service->id_service)
+                ->with('success', 'Imagen eliminada correctamente.');
+        }
+
+        if (! $request->hasFile('imagen')) {
+            return redirect()
+                ->route('admin.tariffs.index', $service->id_service)
+                ->with('error', 'Selecciona una imagen válida para continuar.');
+        }
+
+        if ($service->imagen && Storage::disk('public')->exists($service->imagen)) {
+            Storage::disk('public')->delete($service->imagen);
+        }
+
+        $path = $request->file('imagen')->store('services/'.$service->id_service, 'public');
+        $service->update(['imagen' => $path]);
+
+        return redirect()
+            ->route('admin.tariffs.index', $service->id_service)
+            ->with('success', 'Imagen del servicio actualizada correctamente.');
     }
 
     public function destroy($id)

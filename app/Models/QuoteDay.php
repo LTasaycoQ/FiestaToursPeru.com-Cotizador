@@ -15,6 +15,7 @@ class QuoteDay extends Model
     protected $fillable = [
         'id_quote',
         'day_number',
+        'name',
         'date',
     ];
 

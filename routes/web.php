@@ -189,6 +189,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{quote}/services', [QuoteController::class, 'addService'])->name('add-service');
         Route::put('/{quote}/services/{detail}', [QuoteController::class, 'updateServiceDetail'])->name('update-service');
         Route::delete('/{quote}/services/{detail}', [QuoteController::class, 'removeService'])->name('remove-service');
+        Route::put('/{quote}/days/{day}', [QuoteController::class, 'updateDay'])->name('update-day');
 
         Route::post('/{quote}/accommodations', [QuoteController::class, 'addAccommodation'])->name('add-accommodation');
 
@@ -227,6 +228,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/{service}', [ServiceController::class, 'update'])->name('update');
         Route::delete('/{service}', [ServiceController::class, 'destroy'])->name('destroy');
         Route::post('/{service}/descripciones', [ServiceController::class, 'storeDescription'])->name('descriptions.store');
+        Route::post('/{service}/imagen', [ServiceController::class, 'updateImage'])->name('image.update');
     });
 
     Route::prefix('servicios/{service}/tarifas')->name('admin.tariffs.')->group(function () {

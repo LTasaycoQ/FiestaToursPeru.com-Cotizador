@@ -871,18 +871,49 @@
                 <div><small style="color:#64748b;">Proveedor</small><div style="font-weight:700;color:#0f172a;">{{ $service->supplier?->supplier_name ?? 'Sin proveedor' }}</div></div>
                 <div><small style="color:#64748b;">Categoría</small><div style="font-weight:700;color:#0f172a;">{{ $service->category?->name ?? 'Sin categoría' }}</div></div>
             </div>
-            <form method="POST" action="{{ route('admin.services.descriptions.store', $service->id_service) }}">
-                @csrf
-                <label for="serviceLanguage" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Idioma</label>
-                <select name="id_language" id="serviceLanguage" required style="width:100%;height:42px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px;margin-bottom:14px;">
-                    @foreach($languages->sortBy(fn ($language) => $language->code === 'es' ? 0 : 1) as $language)
-                        <option value="{{ $language->id_language }}">{{ $language->name }} ({{ strtoupper($language->code) }})</option>
-                    @endforeach
-                </select>
-                <label for="serviceDescription" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Descripción</label>
-                <textarea name="description" id="serviceDescription" rows="6" required maxlength="5000" placeholder="Escribe la descripción del servicio..." style="width:100%;border:1px solid #dbe3ef;border-radius:8px;padding:10px;resize:vertical;"></textarea>
-                <button type="submit" class="btn btn-primary" style="margin-top:12px;"><i class="ti ti-device-floppy"></i> Guardar descripción</button>
-            </form>
+
+            <div style="display:grid;grid-template-columns:1.1fr 1.9fr;gap:24px;align-items:start;">
+                <div>
+                    <div style="font-weight:700;color:#0f172a;margin-bottom:10px;">Imagen del servicio</div>
+                    <form method="POST" action="{{ route('admin.services.image.update', $service->id_service) }}" enctype="multipart/form-data">
+                        @csrf
+                        <div style="border:1px dashed #cbd5e1;border-radius:12px;padding:14px;background:#f8fafc;text-align:center;">
+                            @if($service->imagen)
+                                <img src="{{ asset('storage/' . $service->imagen) }}" alt="{{ $service->name_service }}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px;display:block;">
+                            @else
+                                <div style="display:flex;align-items:center;justify-content:center;height:180px;border:1px dashed #dbe3ef;border-radius:10px;background:#fff;color:#94a3b8;font-size:14px;">
+                                    <span>Sin imagen</span>
+                                </div>
+                            @endif
+                            <input type="file" name="imagen" accept="image/*" style="width:100%;margin-top:12px;">
+                            <small style="display:block;color:#64748b;margin-top:8px;">Formatos permitidos: JPG, PNG, WEBP. Máximo 2 MB.</small>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+                            <button type="submit" class="btn btn-primary"><i class="ti ti-upload"></i> Guardar imagen</button>
+                            @if($service->imagen)
+                                <button type="submit" name="delete_imagen" value="1" class="btn btn-secondary" onclick="return confirm('¿Deseas eliminar la imagen actual del servicio?')">
+                                    <i class="ti ti-trash"></i> Eliminar
+                                </button>
+                            @endif
+                        </div>
+                    </form>
+                </div>
+
+                <div>
+                    <form method="POST" action="{{ route('admin.services.descriptions.store', $service->id_service) }}">
+                        @csrf
+                        <label for="serviceLanguage" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Idioma</label>
+                        <select name="id_language" id="serviceLanguage" required style="width:100%;height:42px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px;margin-bottom:14px;">
+                            @foreach($languages->sortBy(fn ($language) => $language->code === 'es' ? 0 : 1) as $language)
+                                <option value="{{ $language->id_language }}">{{ $language->name }} ({{ strtoupper($language->code) }})</option>
+                            @endforeach
+                        </select>
+                        <label for="serviceDescription" style="display:block;font-weight:700;color:#0f172a;margin-bottom:6px;">Descripción</label>
+                        <textarea name="description" id="serviceDescription" rows="6" required maxlength="5000" placeholder="Escribe la descripción del servicio..." style="width:100%;border:1px solid #dbe3ef;border-radius:8px;padding:10px;resize:vertical;"></textarea>
+                        <button type="submit" class="btn btn-primary" style="margin-top:12px;"><i class="ti ti-device-floppy"></i> Guardar descripción</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1225,46 +1225,62 @@ class QuoteController extends Controller
             'id_tariff' => 'nullable|exists:tariff,id_tariff',
             'unit_price' => 'nullable|numeric|min:0',
             'quantity' => 'nullable|integer|min:1',
+            'notes' => 'nullable|string|max:600',
         ]);
+
+        $updateData = [];
+        if ($request->has('notes')) {
+            $updateData['notes'] = trim((string) $request->input('notes')) === '' ? null : trim((string) $request->input('notes'));
+        }
 
         $quantity = (int) ($quote->passengers_count ?: 1);
 
-        // If id_tariff provided, use it; otherwise try to resolve a tariff automatically
-        if (! empty($data['id_tariff'])) {
-            $tariff = Tariff::where('id_tariff', $data['id_tariff'])
-                ->where('id_service', $detail->id_service)
-                ->whereNull('id_season')
-                ->where('status', 'active')
-                ->firstOrFail();
+        if (! empty($data['id_tariff']) || $request->filled('unit_price') || $request->filled('quantity')) {
+            if (! empty($data['id_tariff'])) {
+                $tariff = Tariff::where('id_tariff', $data['id_tariff'])
+                    ->where('id_service', $detail->id_service)
+                    ->whereNull('id_season')
+                    ->where('status', 'active')
+                    ->firstOrFail();
 
-            $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
+                $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
+                $updateData['id_tariff'] = $tariff->id_tariff;
+                $updateData['unit_price'] = $unitPrice;
+                $updateData['quantity'] = $quantity;
+                $updateData['subtotal'] = $unitPrice * $quantity;
+            } else {
+                $service = Service::find($detail->id_service);
+                $tariff = $this->getTariffForService($service, $quantity, $quote);
 
-            $detail->update([
-                'id_tariff' => $tariff->id_tariff,
-                'unit_price' => $unitPrice,
-                'quantity' => $quantity,
-                'subtotal' => $unitPrice * $quantity,
-            ]);
-        } else {
-            // No tariff selected: try to find an appropriate tariff for this service
-            $service = Service::find($detail->id_service);
-            $tariff = $this->getTariffForService($service, $quantity, $quote);
+                if (! $tariff) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No hay una tarifa activa disponible para este servicio.',
+                    ], 422);
+                }
 
-            if (! $tariff) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No hay una tarifa activa disponible para este servicio.',
-                ], 422);
+                $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
+                $updateData['id_tariff'] = $tariff->id_tariff;
+                $updateData['unit_price'] = $unitPrice;
+                $updateData['quantity'] = $quantity;
+                $updateData['subtotal'] = $unitPrice * $quantity;
             }
+        }
 
-            $unitPrice = $this->resolveTariffPrice($tariff, $quantity);
-
-            $detail->update([
-                'id_tariff' => $tariff->id_tariff,
-                'unit_price' => $unitPrice,
-                'quantity' => $quantity,
-                'subtotal' => $unitPrice * $quantity,
+        if (empty($updateData)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No hubo cambios que guardar.',
+                'unit_price' => number_format((float) $detail->unit_price, 2, '.', ''),
+                'subtotal' => number_format((float) $detail->subtotal, 2, '.', ''),
             ]);
+        }
+
+        $detail->update($updateData);
+
+        if (! isset($detail->subtotal) || $detail->subtotal == 0) {
+            $detail->subtotal = $detail->unit_price * ($detail->quantity ?: 1);
+            $detail->save();
         }
 
         $quote->calculateTotals(1);
@@ -1274,6 +1290,31 @@ class QuoteController extends Controller
             'message' => 'Servicio actualizado correctamente.',
             'unit_price' => number_format((float) $detail->unit_price, 2, '.', ''),
             'subtotal' => number_format((float) $detail->subtotal, 2, '.', ''),
+        ]);
+    }
+
+    public function updateDay(Request $request, Quote $quote, QuoteDay $day)
+    {
+        if ((int) $day->id_quote !== (int) $quote->id_quote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El día no pertenece a esta cotización.',
+            ], 404);
+        }
+
+        $data = $request->validate([
+            'name' => 'nullable|string|max:255',
+        ]);
+
+        $day->update([
+            'name' => empty($data['name']) ? null : trim($data['name']),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Nombre del día actualizado.',
+            'name' => $day->name,
+            'label' => $day->name ?: 'Día '.$day->day_number,
         ]);
     }
 
