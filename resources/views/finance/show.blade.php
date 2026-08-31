@@ -233,7 +233,6 @@
                         </a>
                     
                     </div>
-    Q
             @endif
         @endif
     </div>

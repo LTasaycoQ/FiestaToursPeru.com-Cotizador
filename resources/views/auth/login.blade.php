@@ -300,7 +300,7 @@
 <body>
 
     <div class="bg-image">
-        <img src="https://www.machupicchuexploringperu.com/wp-content/uploads/2023/07/header-slider-machu-picchu-one-day-tour-1920x1080-1-2.jpg"
+        <img src="https://res.cloudinary.com/dlgeap8h0/image/upload/v1778686647/iStock-1702599131_ik3v6x.jpg"
              alt="">
     </div>
 
@@ -315,7 +315,7 @@
 
         <div class="left">
             <img class="left-img"
-                 src="https://www.machupicchuexploringperu.com/wp-content/uploads/2023/07/banner-camino-inca.jpg"
+                 src="https://res.cloudinary.com/dlgeap8h0/image/upload/v1772817243/2_14_11zon_pkazjm.webp"
                  alt="Paisaje Fiesta Tours">
             <div class="left-overlay"></div>
 
@@ -352,16 +352,17 @@
                 @csrf
 
                 <label for="email">Correo electrónico</label>
-                <input type="email" id="email" name="email"
+                <input style="margin-bottom: 22px;" type="email" id="email" name="email"
                        value="{{ old('email') }}"
                        placeholder="correo@ejemplo.com"
                        required autofocus>
+                
 
                 <label for="password">Contraseña</label>
 
                 <div class="password-wrapper">
                     <input type="password" id="password" name="password"
-                           placeholder="••••••••" required>
+                           placeholder="" required>
                     <button type="button" class="toggle-password" id="togglePassword" aria-label="Mostrar u ocultar contraseña">
                         <svg viewBox="0 0 24 24">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
