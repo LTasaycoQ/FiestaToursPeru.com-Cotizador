@@ -1321,17 +1321,20 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
     $accommodationSeasonOptions = $accommodationServices->mapWithKeys(function ($service) {
         $seasonMap = $service->tariffs
             ->where('status', 'active')
-            ->pluck('id_season')
-            ->filter()
-            ->unique()
-            ->mapWithKeys(function ($seasonId) use ($service) {
-                $seasonName = $service->tariffs
-                    ->where('status', 'active')
-                    ->first(fn ($tariff) => (int) $tariff->id_season === (int) $seasonId)?->season?->name
-                    ?? 'Temporada '.(int) $seasonId;
+            ->whereNotNull('id_season')
+            ->map(function ($tariff) {
+                $season = $tariff->season;
 
-                return [(string) $seasonId => $seasonName];
-            });
+                return [
+                    'id' => (string) $tariff->id_season,
+                    'name' => $season?->name ?? 'Temporada '.(int) $tariff->id_season,
+                    'start_date' => $season?->start_date?->format('Y-m-d') ?? null,
+                    'end_date' => $season?->end_date?->format('Y-m-d') ?? null,
+                ];
+            })
+            ->unique('id')
+            ->values()
+            ->mapWithKeys(fn ($season) => [(string) $season['id'] => $season]);
 
         return [$service->id_service => $seasonMap->all()];
     });
@@ -1381,6 +1384,8 @@ const existingRoomAllocations = @json($existingRoomAllocations);
 const existingAccommodationSeasons = @json($existingAccommodationSeasons);
 const quoteIsCalculated = {{ (int) ((bool) ($quote->passengers_count ?? false)) }};
 const quoteHasDates = {{ (int) ((bool) ($quote->start_date && $quote->end_date)) }};
+const quoteStartDate = '{{ $quote->start_date ? $quote->start_date->format('Y-m-d') : '' }}';
+const quoteEndDate = '{{ $quote->end_date ? $quote->end_date->format('Y-m-d') : '' }}';
 let currentOccupancyAccommodationId = null;
 let currentOccupancyAccommodationIds = [];
 let currentOccupancyLabel = '';
@@ -2386,6 +2391,35 @@ function selectAccommodationService(serviceId, serviceName) {
     }
 }
 
+function resolveAccommodationSeasonFromQuote(serviceId) {
+    const seasons = accommodationSeasonOptions[serviceId] || {};
+    const entries = Object.entries(seasons || {});
+    if (!quoteHasDates || !quoteStartDate || !quoteEndDate || entries.length === 0) {
+        return null;
+    }
+
+    const start = new Date(quoteStartDate + 'T00:00:00');
+    const end = new Date(quoteEndDate + 'T00:00:00');
+    const matching = entries.filter(([seasonId, season]) => {
+        if (!season || !season.start_date || !season.end_date) {
+            return false;
+        }
+        const seasonStart = new Date(season.start_date + 'T00:00:00');
+        const seasonEnd = new Date(season.end_date + 'T00:00:00');
+        return seasonStart <= end && seasonEnd >= start;
+    });
+
+    if (matching.length === 1) {
+        return matching[0][0];
+    }
+
+    if (entries.length === 1) {
+        return entries[0][0];
+    }
+
+    return null;
+}
+
 function onAccommodationServiceSelect(serviceName = null) {
     const select = document.getElementById('accommodation_service_select');
     const preview = document.getElementById('accPricePreviewText');
@@ -2410,14 +2444,17 @@ function onAccommodationServiceSelect(serviceName = null) {
     const serviceId = Number(select.value);
     const seasons = accommodationSeasonOptions[serviceId] || {};
     const seasonEntries = Object.entries(seasons || {});
-    const showManualSeason = seasonEntries.length > 0 && (!quoteHasDates || seasonEntries.length > 1);
+    const autoDetectedSeason = resolveAccommodationSeasonFromQuote(serviceId);
+    const showManualSeason = seasonEntries.length > 0 && !autoDetectedSeason && (!quoteHasDates || seasonEntries.length > 1);
     const optionKey = `${document.getElementById('acc_option_number')?.value || 1}:${serviceId}`;
     const savedSeason = existingAccommodationSeasons[optionKey] || '';
 
     if (seasonSelect) {
-        seasonSelect.innerHTML = '<option value="">Seleccione la temporada</option>' + seasonEntries.map(([seasonId, seasonName]) => `<option value="${seasonId}">${escapeHtml(seasonName)}</option>`).join('');
+        seasonSelect.innerHTML = '<option value="">Seleccione la temporada</option>' + seasonEntries.map(([seasonId, season]) => `<option value="${seasonId}">${escapeHtml(season.name || 'Temporada')}</option>`).join('');
         if (savedSeason) {
             seasonSelect.value = String(savedSeason);
+        } else if (autoDetectedSeason) {
+            seasonSelect.value = String(autoDetectedSeason);
         } else if (seasonEntries.length === 1) {
             seasonSelect.value = seasonEntries[0][0];
         } else {
@@ -2473,7 +2510,8 @@ function renderAccommodationRoomMatrix() {
         return;
     }
 
-    const seasonName = selectedSeason ? (accommodationSeasonOptions[serviceId]?.[selectedSeason] || 'Temporada seleccionada') : 'Tarifas base';
+    const seasonMeta = selectedSeason ? (accommodationSeasonOptions[serviceId]?.[selectedSeason] || null) : null;
+    const seasonName = seasonMeta ? (seasonMeta.name || 'Temporada seleccionada') : 'Tarifas base';
     const priceSummary = tariffs.map(tariff => `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#312e81; font-size:12px; margin-right:6px; margin-bottom:6px;">${escapeHtml(tariff.name)}: $ ${Number(tariff.price).toFixed(2)}</span>`).join('');
     const preview = document.getElementById('accPricePreviewText');
     if (preview) {

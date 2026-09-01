@@ -880,6 +880,39 @@ class QuoteController extends Controller
         return $counts;
     }
 
+    private function resolveSeasonIdForQuote(Service $service, Quote $quote, ?int $selectedSeasonId = null): ?int
+    {
+        if ($selectedSeasonId !== null) {
+            return $selectedSeasonId;
+        }
+
+        if (! $quote->start_date || ! $quote->end_date) {
+            return null;
+        }
+
+        $matchingSeason = Tariff::with('season')
+            ->where('id_service', $service->id_service)
+            ->where('status', 'active')
+            ->whereNotNull('id_season')
+            ->whereHas('season', function ($query) use ($quote) {
+                $query->where('status', 'active')
+                    ->where('start_date', '<=', $quote->end_date)
+                    ->where('end_date', '>=', $quote->start_date);
+            })
+            ->select('id_season')
+            ->get()
+            ->pluck('id_season')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($matchingSeason->count() === 1) {
+            return (int) $matchingSeason->first();
+        }
+
+        return null;
+    }
+
     private function getTariffForService(Service $service, int $passengersCount, ?Quote $quote = null): ?Tariff
     {
         $query = Tariff::with('season')
@@ -1238,13 +1271,21 @@ class QuoteController extends Controller
             $updateData['notes'] = trim((string) $request->input('notes')) === '' ? null : trim((string) $request->input('notes'));
         }
 
-        $quantity = (int) ($quote->passengers_count ?: 1);
+        $quantity = (int) ($request->filled('quantity') ? ($data['quantity'] ?? $detail->quantity ?? $quote->passengers_count ?? 1) : ($detail->quantity ?? $quote->passengers_count ?? 1));
+        $manualUnitPrice = $request->filled('unit_price') ? (float) $data['unit_price'] : null;
 
         if (! empty($data['id_tariff']) || $request->filled('unit_price') || $request->filled('quantity')) {
-            if (! empty($data['id_tariff'])) {
+            if ($manualUnitPrice !== null) {
+                $updateData['unit_price'] = $manualUnitPrice;
+                $updateData['quantity'] = $quantity;
+                $updateData['subtotal'] = $manualUnitPrice * $quantity;
+
+                if (! empty($data['id_tariff'])) {
+                    $updateData['id_tariff'] = $data['id_tariff'];
+                }
+            } elseif (! empty($data['id_tariff'])) {
                 $tariff = Tariff::where('id_tariff', $data['id_tariff'])
                     ->where('id_service', $detail->id_service)
-                    ->whereNull('id_season')
                     ->where('status', 'active')
                     ->firstOrFail();
 
@@ -1427,7 +1468,9 @@ class QuoteController extends Controller
             ->distinct('id_season')
             ->count('id_season');
 
-        if ($serviceSeasonCount > 0 && $selectedSeasonId === null && (!$quote->start_date || !$quote->end_date || $serviceSeasonCount > 1)) {
+        $selectedSeasonId = $this->resolveSeasonIdForQuote($service, $quote, $selectedSeasonId);
+
+        if ($serviceSeasonCount > 0 && $selectedSeasonId === null && (!$quote->start_date || !$quote->end_date)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Este hotel tiene tarifas por temporada. Selecciona la temporada antes de guardar.',
