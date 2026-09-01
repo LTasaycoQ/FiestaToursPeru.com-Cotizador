@@ -17,6 +17,7 @@ class QuoteAccommodation extends Model
         'id_quote_day',
         'id_service',
         'id_tariff',
+        'id_season',
         'id_supplier',
         'room_type',
         'room_capacity',
@@ -55,6 +56,11 @@ class QuoteAccommodation extends Model
     public function tariff(): BelongsTo
     {
         return $this->belongsTo(Tariff::class, 'id_tariff', 'id_tariff');
+    }
+
+    public function season(): BelongsTo
+    {
+        return $this->belongsTo(Season::class, 'id_season', 'id_season');
     }
 
     public function supplier(): BelongsTo

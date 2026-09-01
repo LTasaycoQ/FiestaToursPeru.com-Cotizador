@@ -838,11 +838,10 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                        
                                                     </div>
                                                     <div style="display:flex; gap:8px; align-items:center;">
-                                                        <div style="min-width:80px; text-align:right; font-weight:600;">@if($priceDisplay) $ {{ $priceDisplay }} @else Varios precios @endif</div>
                                                         <div style="display:flex; gap:6px;">
                                                             <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg1_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
-                                                            <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(1, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i> Habitaciones</button>
-                                                            <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> Eliminar</button>
+                                                            <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(1, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i></button>
+                                                            <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> </button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1221,6 +1220,14 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                     <input type="hidden" id="accommodation_service_select" name="id_service" value="">
                 </div>
 
+                <div id="accommodationSeasonSelector" class="form-group" style="display:none; margin-bottom:16px;">
+                    <label for="accommodation_season_select">Temporada del hotel</label>
+                    <select class="form-control" id="accommodation_season_select" name="id_season">
+                        <option value="">Seleccione la temporada</option>
+                    </select>
+                    <div class="field-hint">Si la cotización aún no tiene fechas definidas, elige la temporada manualmente para evitar errores de tarifa.</div>
+                </div>
+
                 <div id="accommodationRoomTypes" class="form-group" style="display:none; margin-bottom:16px;">
                     <label>Cantidad de habitaciones por tarifa</label>
                     <div id="accommodationRoomTypeRows" style="display:grid; gap:8px;"></div>
@@ -1299,16 +1306,34 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
         return [
             $service->id_service => $service->tariffs
                 ->where('status', 'active')
-                ->groupBy(fn ($tariff) => strtolower(trim((string) ($tariff->subCategory->name ?? 'Sin subcategoría'))))
-                ->map(fn ($tariffs) => $tariffs->sortByDesc(fn ($tariff) => $tariff->id_season !== null)->first())
                 ->map(function ($tariff) {
                     return [
                         'id_tariff' => $tariff->id_tariff,
                         'name' => $tariff->subCategory->name ?? 'Sin subcategoría',
                         'price' => (float) $tariff->price,
+                        'season_id' => $tariff->id_season,
+                        'season_name' => $tariff->season?->name,
                     ];
                 })->values(),
         ];
+    });
+
+    $accommodationSeasonOptions = $accommodationServices->mapWithKeys(function ($service) {
+        $seasonMap = $service->tariffs
+            ->where('status', 'active')
+            ->pluck('id_season')
+            ->filter()
+            ->unique()
+            ->mapWithKeys(function ($seasonId) use ($service) {
+                $seasonName = $service->tariffs
+                    ->where('status', 'active')
+                    ->first(fn ($tariff) => (int) $tariff->id_season === (int) $seasonId)?->season?->name
+                    ?? 'Temporada '.(int) $seasonId;
+
+                return [(string) $seasonId => $seasonName];
+            });
+
+        return [$service->id_service => $seasonMap->all()];
     });
 
     $existingRoomAllocations = $quote->accommodations
@@ -1317,6 +1342,14 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
             $accommodation->option_number . ':' . $accommodation->id_service . ':' . $accommodation->quoteDay->day_number . ':' . $accommodation->id_tariff
                 => (int) $accommodation->room_count,
         ]);
+
+    $existingAccommodationSeasons = $quote->accommodations
+        ->filter(fn ($accommodation) => $accommodation->id_service)
+        ->mapWithKeys(fn ($accommodation) => [
+            $accommodation->option_number . ':' . $accommodation->id_service => (string) ($accommodation->id_season ?? ($accommodation->tariff?->id_season ?? '')),
+        ])
+        ->filter(fn ($seasonId) => $seasonId !== '')
+        ->all();
 @endphp
 <script>
 function switchQuoteTab(tab) {
@@ -1342,9 +1375,12 @@ const REMOVE_SERVICE_URL_BASE = '{{ route("admin.quotes.remove-service", [$quote
 const ADD_ACCOMMODATION_TO_DAY_URL = '{{ route("admin.quotes.add-accommodation-to-day", $quote->id_quote) }}';
 const REMOVE_ACCOMMODATION_URL_BASE = '{{ route("admin.quotes.remove-accommodation", [$quote->id_quote, "__ID__"]) }}';
 const accommodationTariffs = @json($accommodationTariffs);
+const accommodationSeasonOptions = @json($accommodationSeasonOptions);
 const accommodationDays = @json($quote->quoteDays->pluck('day_number')->values());
 const existingRoomAllocations = @json($existingRoomAllocations);
+const existingAccommodationSeasons = @json($existingAccommodationSeasons);
 const quoteIsCalculated = {{ (int) ((bool) ($quote->passengers_count ?? false)) }};
+const quoteHasDates = {{ (int) ((bool) ($quote->start_date && $quote->end_date)) }};
 let currentOccupancyAccommodationId = null;
 let currentOccupancyAccommodationIds = [];
 let currentOccupancyLabel = '';
@@ -2326,9 +2362,13 @@ function closeAccommodationToDayModal() {
     const search = document.getElementById('accommodation_search');
     const category = document.getElementById('accommodation_category_filter');
     const hiddenInput = document.getElementById('accommodation_service_select');
+    const seasonSelect = document.getElementById('accommodation_season_select');
+    const seasonPanel = document.getElementById('accommodationSeasonSelector');
     if (search) search.value = '';
     if (category) category.value = '';
     if (hiddenInput) hiddenInput.value = '';
+    if (seasonSelect) seasonSelect.value = '';
+    if (seasonPanel) seasonPanel.style.display = 'none';
     accommodationCatalogPage = 1;
     filterAccommodationCatalog();
 }
@@ -2351,6 +2391,9 @@ function onAccommodationServiceSelect(serviceName = null) {
     const preview = document.getElementById('accPricePreviewText');
     const typesPanel = document.getElementById('accommodationRoomTypes');
     const typesRows = document.getElementById('accommodationRoomTypeRows');
+    const seasonSelect = document.getElementById('accommodation_season_select');
+    const seasonPanel = document.getElementById('accommodationSeasonSelector');
+
     if (!select || !preview) {
         return;
     }
@@ -2359,25 +2402,52 @@ function onAccommodationServiceSelect(serviceName = null) {
         preview.innerHTML = 'Selecciona un hotel de la tabla y luego guarda el rango de días.';
         if (typesPanel) typesPanel.style.display = 'none';
         if (typesRows) typesRows.innerHTML = '';
+        if (seasonSelect) seasonSelect.value = '';
+        if (seasonPanel) seasonPanel.style.display = 'none';
         return;
     }
 
-    const name = serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel';
+    const serviceId = Number(select.value);
+    const seasons = accommodationSeasonOptions[serviceId] || {};
+    const seasonEntries = Object.entries(seasons || {});
+    const showManualSeason = seasonEntries.length > 0 && (!quoteHasDates || seasonEntries.length > 1);
+    const optionKey = `${document.getElementById('acc_option_number')?.value || 1}:${serviceId}`;
+    const savedSeason = existingAccommodationSeasons[optionKey] || '';
+
+    if (seasonSelect) {
+        seasonSelect.innerHTML = '<option value="">Seleccione la temporada</option>' + seasonEntries.map(([seasonId, seasonName]) => `<option value="${seasonId}">${escapeHtml(seasonName)}</option>`).join('');
+        if (savedSeason) {
+            seasonSelect.value = String(savedSeason);
+        } else if (seasonEntries.length === 1) {
+            seasonSelect.value = seasonEntries[0][0];
+        } else {
+            seasonSelect.value = '';
+        }
+    }
+    if (seasonPanel) {
+        seasonPanel.style.display = showManualSeason ? 'block' : 'none';
+    }
+
+    if (seasonSelect && seasonSelect.value) {
+        renderAccommodationRoomMatrix();
+    }
+
     if (!accommodationEditingExisting) {
         if (typesPanel) typesPanel.style.display = 'none';
         if (typesRows) typesRows.innerHTML = '';
-        preview.innerHTML = '<strong>' + name + '</strong>: hotel seleccionado. La distribución de pasajeros y habitaciones se configurará después de registrar esta opción.';
+        preview.innerHTML = '<strong>' + (serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel') + '</strong>: hotel seleccionado. La distribución de pasajeros y habitaciones se configurará después de registrar esta opción.';
         return;
     }
 
     renderAccommodationRoomMatrix();
     if (typesPanel) typesPanel.style.display = 'block';
-    preview.innerHTML = '<strong>' + name + '</strong>: define cuántas habitaciones usarás por tipo y por día.';
+    preview.innerHTML = '<strong>' + (serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel') + '</strong>: define cuántas habitaciones usarás por tipo y por día.';
 }
 
 function renderAccommodationRoomMatrix() {
     const serviceSelect = document.getElementById('accommodation_service_select');
     const rows = document.getElementById('accommodationRoomTypeRows');
+    const seasonSelect = document.getElementById('accommodation_season_select');
     const start = Number(document.getElementById('acc_day_start_select')?.value || 0);
     const end = Number(document.getElementById('acc_day_end_select')?.value || 0);
     if (!serviceSelect || !rows || !start || !end || !serviceSelect.value) {
@@ -2385,13 +2455,31 @@ function renderAccommodationRoomMatrix() {
         return;
     }
 
+    const serviceId = Number(serviceSelect.value);
+    const selectedSeason = seasonSelect ? seasonSelect.value : '';
+    const allTariffs = accommodationTariffs[serviceId] || [];
+    const tariffs = selectedSeason
+        ? allTariffs.filter(tariff => String(tariff.season_id ?? '') === String(selectedSeason))
+        : allTariffs.filter(tariff => tariff.season_id === null || tariff.season_id === undefined || tariff.season_id === '');
+
     const days = accommodationDays.filter(day => day >= start && day <= end);
-    const tariffs = accommodationTariffs[serviceSelect.value] || [];
     const columns = ['all', ...days];
-    if (tariffs.length === 0) {
-        rows.innerHTML = '<div class="field-hint">Este hotel no tiene tarifas activas configuradas. Registra primero sus tarifas SPL, DBL o TPL.</div>';
+    if (Object.keys(accommodationSeasonOptions[serviceId] || {}).length > 0 && !selectedSeason) {
+        rows.innerHTML = '<div class="field-hint">Selecciona la temporada del hotel antes de definir habitaciones.</div>';
         return;
     }
+    if (tariffs.length === 0) {
+        rows.innerHTML = '<div class="field-hint">Este hotel no tiene tarifas activas para la temporada seleccionada. Elige otra temporada o registra nuevas tarifas.</div>';
+        return;
+    }
+
+    const seasonName = selectedSeason ? (accommodationSeasonOptions[serviceId]?.[selectedSeason] || 'Temporada seleccionada') : 'Tarifas base';
+    const priceSummary = tariffs.map(tariff => `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#312e81; font-size:12px; margin-right:6px; margin-bottom:6px;">${escapeHtml(tariff.name)}: $ ${Number(tariff.price).toFixed(2)}</span>`).join('');
+    const preview = document.getElementById('accPricePreviewText');
+    if (preview) {
+        preview.innerHTML = `<strong>${document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${serviceId}"]`)?.textContent?.trim() || 'Hotel'}</strong><br><span style="color:var(--qe-ink-500);">Temporada: ${escapeHtml(seasonName)}</span><br>${priceSummary}`;
+    }
+
     rows.innerHTML = `
         <div style="overflow-x:auto;">
             <table style="width:100%; min-width:560px; border-collapse:collapse;">
@@ -2448,6 +2536,8 @@ function resetAccTariffSection() {
     const selectedService = document.getElementById('accommodationSelectedService');
     const serviceField = document.getElementById('accommodationServiceField');
     const dateFields = document.getElementById('accommodationDateFields');
+    const seasonSelect = document.getElementById('accommodation_season_select');
+    const seasonPanel = document.getElementById('accommodationSeasonSelector');
     if (preview) {
         preview.innerHTML = 'Selecciona un hotel de la tabla y luego guarda el rango de días.';
     }
@@ -2457,6 +2547,8 @@ function resetAccTariffSection() {
     if (selectedService) selectedService.style.display = 'none';
     if (serviceField) serviceField.style.display = '';
     if (dateFields) dateFields.style.display = 'grid';
+    if (seasonSelect) seasonSelect.value = '';
+    if (seasonPanel) seasonPanel.style.display = 'none';
 }
 
 function updateAccommodationToDayPricePreviewText(text, hasPrice) {
@@ -2490,6 +2582,14 @@ function addAccommodationToDay() {
 
     if (!dayStart || !dayEnd) {
         Swal.fire({ icon: 'warning', title: 'Define el rango de días', text: 'Selecciona el día inicial y final para el hotel.', confirmButtonColor: '#6366f1' });
+        return;
+    }
+
+    const seasonSelect = document.getElementById('accommodation_season_select');
+    const selectedSeason = seasonSelect ? seasonSelect.value : '';
+    const serviceHasSeasons = Object.keys(accommodationSeasonOptions[Number(serviceSelect.value)] || {}).length > 0;
+    if (serviceHasSeasons && !selectedSeason) {
+        Swal.fire({ icon: 'warning', title: 'Selecciona la temporada', text: 'Este hotel tiene tarifas por temporada. Elige la temporada antes de guardar.', confirmButtonColor: '#6366f1' });
         return;
     }
 
@@ -2761,6 +2861,7 @@ function cargarContactos() {
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('acc_day_start_select')?.addEventListener('change', renderAccommodationRoomMatrix);
     document.getElementById('acc_day_end_select')?.addEventListener('change', renderAccommodationRoomMatrix);
+    document.getElementById('accommodation_season_select')?.addEventListener('change', renderAccommodationRoomMatrix);
     var quoteNewContactForm = document.getElementById('quoteNewContactForm');
     if (quoteNewContactForm) {
         quoteNewContactForm.addEventListener('submit', saveQuoteContactModal);
