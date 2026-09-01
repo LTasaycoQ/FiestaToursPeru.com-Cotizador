@@ -59,31 +59,48 @@ class QuoteDocxExport
 
             foreach ($details as $detail) {
                 $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
-                $section->addText($serviceName, ['bold' => true, 'size' => 12]);
-
                 $description = $this->extractDescription($detail->service, $quote->id_language);
+                $notes = trim((string) ($detail->notes ?? ''));
+
+                $table = $section->addTable([
+                    'borderSize' => 6,
+                    'borderColor' => 'FFFFFF',
+                    'cellMargin' => 80,
+                    'width' => 120,
+                    'unit' => 'pct',
+                ]);
+                $table->addRow();
+
+                $leftCell = $table->addCell(7000);
+                $leftCell->addText($serviceName, ['bold' => true, 'size' => 12]);
+
                 if (trim((string) $description) !== '') {
-                    $section->addText($description);
+                    $leftCell->addTextBreak();
+                    $leftCell->addText($description);
                 }
 
+                if ($notes !== '') {
+                    $leftCell->addTextBreak();
+                    $leftCell->addText($notes, ['bold' => true, 'color' => 'C90202', 'size' => 9]);
+                }
+
+                $rightCell = $table->addCell(3000);
                 $principalImage = $detail->service?->principalImage()->first();
                 $imagePath = $principalImage?->image_path ?? ($detail->service?->imagen ? $detail->service->imagen : null);
 
                 if ($imagePath) {
                     $absoluteImagePath = Storage::disk('public')->path($imagePath);
                     if (file_exists($absoluteImagePath)) {
-                        $section->addImage($absoluteImagePath, [
-                            'width' => 180,
-                            'height' => 120,
+                        $rightCell->addImage($absoluteImagePath, [
+                            'width' => 140,
+                            'height' => 95,
                             'wrappingStyle' => 'square',
                             'position' => 'relative',
                         ]);
                     }
                 }
 
-                if (trim((string) $description) === '') {
-                    $section->addText('');
-                }
+                $section->addTextBreak(0.5);
             }
 
             $section->addTextBreak();

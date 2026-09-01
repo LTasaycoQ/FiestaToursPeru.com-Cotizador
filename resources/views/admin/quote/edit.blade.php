@@ -311,9 +311,12 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             {{ $quote->status_label }}
                         </span>
                     </div>
-                    {{-- <div class="header-actions" style="display:flex; gap:8px;">
+                    <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
                         <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
-                            <i class="ti ti-file-spreadsheet"></i> Excel
+                            <i class="ti ti-file-spreadsheet"></i> Excel detalle
+                        </a>
+                        <a href="{{ route('admin.quotes.export.excel.tariffs', $quote->id_quote) }}" class="btn btn-secondary">
+                            <i class="ti ti-file-spreadsheet"></i> Excel tarifas
                         </a>
                         <a href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" class="btn btn-secondary" target="_blank">
                             <i class="ti ti-file-text"></i> PDF
@@ -321,7 +324,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <button class="btn btn-danger" onclick="confirmDelete({{ $quote->id_quote }}, '{{ addslashes($quote->name ?? 'Cotización') }}')">
                             <i class="ti ti-trash"></i> Eliminar
                         </button>
-                    </div> --}}
+                    </div>}
                 </div>
 
                 <!-- ===== BODY ===== -->

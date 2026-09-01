@@ -219,7 +219,10 @@
                     </div>
                     <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
                         <a href="{{ route('admin.quotes.export.excel', $quote->id_quote) }}" class="btn btn-secondary">
-                            <i class="ti ti-file-spreadsheet"></i> Excel
+                            <i class="ti ti-file-spreadsheet"></i> Excel detalle
+                        </a>
+                        <a href="{{ route('admin.quotes.export.excel.tariffs', $quote->id_quote) }}" class="btn btn-secondary">
+                            <i class="ti ti-file-spreadsheet"></i> Excel tarifas
                         </a>
                         <a href="{{ route('admin.quotes.export.pdf', $quote->id_quote) }}" class="btn btn-secondary" target="_blank">
                             <i class="ti ti-file-text"></i> PDF
