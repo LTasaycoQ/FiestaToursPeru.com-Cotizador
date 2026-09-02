@@ -259,8 +259,10 @@ class Quote extends Model
     public function calculateTotals(int $accommodationOption = 1): void
     {
         $itineraryTotal = $this->details()->sum('subtotal');
+        $checkoutDay = $this->quoteDays()->max('day_number');
         $accommodationTotal = $this->accommodations()
             ->where('option_number', $accommodationOption)
+            ->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))
             ->sum('subtotal');
 
         $this->subtotal = $itineraryTotal + $accommodationTotal;
@@ -271,10 +273,11 @@ class Quote extends Model
     public function getTotalsByOption(): array
     {
         $itineraryTotal = $this->details()->sum('subtotal');
+        $checkoutDay = $this->quoteDays()->max('day_number');
 
         return [
-            1 => $itineraryTotal + $this->accommodations()->where('option_number', 1)->sum('subtotal'),
-            2 => $itineraryTotal + $this->accommodations()->where('option_number', 2)->sum('subtotal'),
+            1 => $itineraryTotal + $this->accommodations()->where('option_number', 1)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
+            2 => $itineraryTotal + $this->accommodations()->where('option_number', 2)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
         ];
     }
 

@@ -840,7 +840,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 </div>
                                                                 <div class="day-hotel">
                                                                     <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
-                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @if($d < $quote->quoteDays->max('day_number'))
+                                                                        <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @endif
                                                                 </div>
                                                                 <div class="day-actions">
                                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(1, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">
@@ -958,12 +960,14 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                         @foreach($days as $d)
                                                             <div class="accommodation-day-item" id="acc-{{ $group['accom_ids'][$d] }}">
                                                                 <div class="day-info">
-                                                                    <span class="day-number">Día {{ $d }}</span>
+                                                                    <span class="day-number">Noches {{ $d }}</span>
                                                                     <span class="day-date">{{ $group['dates'][$d] }}</span>
                                                                 </div>
                                                                 <div class="day-hotel">
                                                                     <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
-                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @if($d < $quote->quoteDays->max('day_number'))
+                                                                        <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @endif
                                                                 </div>
                                                                 <div class="day-actions">
                                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(2, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">
@@ -1108,7 +1112,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 </div>
                                                                 <div class="day-hotel">
                                                                     <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
-                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @if($d < $quote->quoteDays->max('day_number'))
+                                                                        <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                    @endif
                                                                 </div>
                                                                 <div class="day-actions">
                                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">

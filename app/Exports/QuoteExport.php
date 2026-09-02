@@ -33,6 +33,8 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
     public function headings(): array
     {
+        $quote = Quote::with('client')->findOrFail($this->quoteId);
+
         if ($this->mode === 'tariff') {
             return [
                 ['TIPO', 'DÍA', 'Traslados Tours y Paquetes', 'Regular Económico', '', 'Regular VIP', '', 'Servicios Privados', '', '', '', '', '', '', '', ''],
@@ -41,16 +43,15 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         }
 
         return [
-            ['', '', '', ''],
-            ['FIESTA TOURS PERU', '', '', ''],
-            ['Av San Luis 2644 San Borja T: +51-1 225-1336', '', '', ''],
+            // ['FIESTA TOURS PERU', '', '', ''],
+            // ['Av San Luis 2644 San Borja T: +51-1 225-1336', '', '', ''],
 
-            ['Para:', $quote->client->name_client ?? 'No Definido', '', ''],
-            ['REF:', $quote->name ?? 'No Definido', '', ''],
+            // ['Para:', $quote->client->name_client ?? 'No Definido', '', ''],
+            // ['REF:', $quote->name ?? 'No Definido', '', ''],
             ['FECHA:', now()->format('d/m/Y'), '', ''],
             ['', '', '', ''],
             ['', '', '', ''],
-            ['FECHA', 'CIUDAD','SERVICIO', 'PRECIO'],
+            ['FECHA', 'CIUDAD', 'SERVICIO', 'PRECIO'],
         ];
     }
 
@@ -117,22 +118,21 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
                 $unitPrice = (float) ($detail->unit_price ?? 0);
 
-                $quantity = (int) ($detail->quantity ?: $passengers);
                 $rows->push([
                     'Día '.$day->day_number,
                     $day->name,
                     $serviceName,
                     $unitPrice,
-                
+
                 ]);
 
                 $grandSubtotal += $unitPrice;
             }
         }
 
-        $rows->push(['','', 'Servicios, precio neto por persona no comisionable:', $grandSubtotal]);
-        $rows->push(['','', '', $passengers]);
-        $rows->push(['','', 'Sub Total Servicios', $grandSubtotal * $passengers]);
+        $rows->push(['', '', 'Servicios, precio neto por persona no comisionable:', $grandSubtotal]);
+        $rows->push(['', '', '', $passengers]);
+        $rows->push(['', '', 'Sub Total Servicios', $grandSubtotal * $passengers]);
 
         $accommodationsByOption = $quote->accommodations
             ->sortBy([
@@ -144,22 +144,34 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
         foreach ($accommodationsByOption as $optionNumber => $accommodations) {
             $rows->push(['', '', '', '']);
-            $rows->push(['HOSPEDAJE - OPCIÓN '.$optionNumber, '', '', '', '', '']);
-            $rows->push(['DÍA', 'HOTEL', 'TIPO DE HABITACIÓN', 'N° HABITACIONES', 'PRECIO UNITARIO', 'SUBTOTAL']);
+            $rows->push(['NTS', 'HOTEL', 'SPL', 'DBL', 'TPL', 'TOTAL']);
 
             $optionSubtotal = 0;
-            foreach ($accommodations as $accommodation) {
-                $subtotal = (float) ($accommodation->subtotal ?? 0);
+            $accommodations->groupBy(fn ($accommodation) => implode(':', [
+                $accommodation->id_service,
+                $accommodation->id_season ?? $accommodation->tariff?->id_season ?? 'base',
+            ]))->each(function (Collection $hotelRows) use (&$rows, &$optionSubtotal): void {
+                $accommodation = $hotelRows->first();
+                $subtotal = (float) $hotelRows->sum(fn ($row) => (int) ($row->room_count ?? 0) * (float) ($row->unit_price ?? 0));
                 $optionSubtotal += $subtotal;
+                $prices = $hotelRows
+                    ->groupBy(fn ($row) => $this->hotelRoomTypeCode($row->room_type, $row->tariff?->subCategory?->name))
+                    ->map(fn (Collection $rooms) => $rooms
+                        ->pluck('unit_price')
+                        ->filter(fn ($price) => $price !== null)
+                        ->map(fn ($price) => number_format((float) $price, 2, '.', ''))
+                        ->unique()
+                        ->implode(' / '));
+
                 $rows->push([
-                    $accommodation->quoteDay ? 'Día '.$accommodation->quoteDay->day_number : '',
+                    $hotelRows->pluck('id_quote_day')->unique()->count(),
                     $this->hotelCell($accommodation),
-                    $accommodation->tariff?->subCategory?->name ?? ucfirst($accommodation->room_type ?? 'Sin tipo'),
-                    (int) ($accommodation->room_count ?? 0),
-                    (float) ($accommodation->unit_price ?? 0),
+                    $prices->get('SPL', ''),
+                    $prices->get('DBL', ''),
+                    $prices->get('TPL', ''),
                     $subtotal,
                 ]);
-            }
+            });
 
             $rows->push(['', '', '', '', 'TOTAL OPCIÓN '.$optionNumber, $optionSubtotal]);
         }
@@ -173,27 +185,24 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         $serviceName = $accommodation->service?->name_service ?? 'Servicio eliminado';
         $richText = new RichText;
         $richText->createTextRun($hotelName)->getFont()->setBold(true);
-        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF808080'));
+        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('7191A8'));
 
         return $richText;
     }
 
+    private function hotelRoomTypeCode(?string $roomType, ?string $tariffName): string
+    {
+        $value = mb_strtolower(($roomType ?? '').' '.($tariffName ?? ''));
+
+        return str_contains($value, 'tpl') || str_contains($value, 'triple')
+            ? 'TPL'
+            : (str_contains($value, 'dbl') || str_contains($value, 'doble') || str_contains($value, 'double')
+                ? 'DBL'
+                : 'SPL');
+    }
+
     public function styles(Worksheet $sheet): array
     {
-        if ($this->mode === 'tariff') {
-            return [
-                1 => [
-                    'font' => ['bold' => true],
-                    'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '7DC7C7']],
-                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-                ],
-                2 => [
-                    'font' => ['bold' => true],
-                    'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE33A']],
-                    'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-                ],
-            ];
-        }
 
         return [
             1 => [
@@ -247,6 +256,16 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                         ]);
                     }
+                }
+
+                if ($this->mode !== 'tariff') {
+                    $sheet->getColumnDimension('A')->setWidth(10);
+                    $sheet->getColumnDimension('B')->setWidth(30);
+                    $sheet->getColumnDimension('C')->setWidth(14);
+                    $sheet->getColumnDimension('D')->setWidth(14);
+                    $sheet->getColumnDimension('E')->setWidth(14);
+                    $sheet->getColumnDimension('F')->setWidth(16);
+                    $sheet->getStyle('B1:B'.$sheet->getHighestRow())->getAlignment()->setWrapText(true);
                 }
             },
         ];

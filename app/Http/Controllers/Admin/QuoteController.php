@@ -1498,6 +1498,13 @@ class QuoteController extends Controller
             ], 422);
         }
 
+        if ($endDay === $startDay) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El rango del hotel debe incluir el día de salida para generar al menos una noche.',
+            ], 422);
+        }
+
         $service = Service::with(['category', 'tariffs'])->where('status', 'active')->find($data['id_service']);
         if (! $service || ! $this->supportsFlatAccommodationPricing($service) || ! $this->isAccommodationService($service)) {
             return response()->json([
@@ -1555,7 +1562,7 @@ class QuoteController extends Controller
                 ->values();
 
             $daysAssigned = 0;
-            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+            for ($dayNumber = $startDay; $dayNumber < $endDay; $dayNumber++) {
                 $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
 
                 if (! $day) {
@@ -1648,7 +1655,7 @@ class QuoteController extends Controller
         if (! $request->filled('id_accommodation')) {
             // Register the hotel without room quantities; rooms can be defined later.
             $daysAssigned = 0;
-            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+            for ($dayNumber = $startDay; $dayNumber < $endDay; $dayNumber++) {
                 $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
 
                 if (! $day) {
@@ -1781,7 +1788,7 @@ class QuoteController extends Controller
 
             if (empty($capacityToTariff)) {
                 // No hay subcategorías en las tarifas: crear la fila única como antes
-                for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                for ($dayNumber = $startDay; $dayNumber < $endDay; $dayNumber++) {
                     $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
                     if (! $day) {
                         continue;
@@ -1812,7 +1819,7 @@ class QuoteController extends Controller
                 $capacities = array_keys($capacityToTariff);
                 $alloc = $this->computeRoomAllocation($passengersCount, $capacities); // mapa capacity => rooms
 
-                for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+                for ($dayNumber = $startDay; $dayNumber < $endDay; $dayNumber++) {
                     $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
                     if (! $day) {
                         continue;
@@ -1848,7 +1855,7 @@ class QuoteController extends Controller
             }
         } else {
             // Comportamiento tradicional: crear una sola fila de alojamiento según roomType/roomCount
-            for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
+            for ($dayNumber = $startDay; $dayNumber < $endDay; $dayNumber++) {
                 $day = $quote->quoteDays()->where('day_number', $dayNumber)->first();
 
                 if (! $day) {
