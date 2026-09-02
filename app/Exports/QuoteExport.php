@@ -41,10 +41,16 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         }
 
         return [
-            ['FECHA DE GENERACIÓN', now()->format('d/m/Y H:i'), '', ''],
             ['', '', '', ''],
-            ['SERVICIOS', '', '', ''],
-            ['DÍA', 'SERVICIO', 'PRECIO UNITARIO', 'SUBTOTAL'],
+            ['FIESTA TOURS PERU', '', '', ''],
+            ['Av San Luis 2644 San Borja T: +51-1 225-1336', '', '', ''],
+
+            ['Para:', $quote->client->name_client ?? 'No Definido', '', ''],
+            ['REF:', $quote->name ?? 'No Definido', '', ''],
+            ['FECHA:', now()->format('d/m/Y'), '', ''],
+            ['', '', '', ''],
+            ['', '', '', ''],
+            ['FECHA', 'CIUDAD', 'SERVICIO', 'PRECIO'],
         ];
     }
 
@@ -110,23 +116,23 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             foreach ($day->details->sortBy('id_detail_quote') as $detail) {
                 $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
                 $unitPrice = (float) ($detail->unit_price ?? 0);
-                $quantity = (int) ($detail->quantity ?: $passengers);
-                $subtotal = (float) ($detail->subtotal ?? ($unitPrice * $quantity));
 
+                $quantity = (int) ($detail->quantity ?: $passengers);
                 $rows->push([
                     'Día '.$day->day_number,
+                    $day->name,
                     $serviceName,
                     $unitPrice,
-                    $subtotal,
+
                 ]);
 
-                $grandSubtotal += $subtotal;
+                $grandSubtotal += $unitPrice;
             }
         }
 
-        $rows->push(['', '', 'TOTAL GENERAL', $grandSubtotal]);
-        $rows->push(['', '', 'N° PASAJEROS', $passengers]);
-        $rows->push(['', '', 'TOTAL X PASAJEROS', $grandSubtotal * $passengers]);
+        $rows->push(['', '', 'Servicios, precio neto por persona no comisionable:', $grandSubtotal]);
+        $rows->push(['', '', '', $passengers]);
+        $rows->push(['', '', 'Sub Total Servicios', $grandSubtotal * $passengers]);
 
         $accommodationsByOption = $quote->accommodations
             ->sortBy([
@@ -166,8 +172,8 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         $hotelName = $accommodation->service?->supplier?->supplier_name ?? 'Hotel no especificado';
         $serviceName = $accommodation->service?->name_service ?? 'Servicio eliminado';
         $richText = new RichText;
-        $richText->createTextRun($hotelName)->getFont()->setBold(true);
-        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF808080'));
+        $richText->createTextRun($hotelName)->getFont()->setBold(true)->setColor(new Color('FF1F4E78'));
+        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF7F8C8D'));
 
         return $richText;
     }
@@ -191,16 +197,17 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
         return [
             1 => [
-                'font' => ['bold' => true],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'D9EAF7']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '1F4E78']],
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             ],
             3 => [
-                'font' => ['bold' => true, 'size' => 14],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '737070']],
+                'font' => ['bold' => true, 'size' => 13],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '548235']],
+                'font' => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
             ],
             4 => [
-                'font' => ['bold' => true],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E2F0D9']],
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '70AD47']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
             'A1:F'.$sheet->getHighestRow() => [
@@ -232,12 +239,12 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                     $value = (string) $sheet->getCell('A'.$row->getRowIndex())->getValue();
                     if (str_starts_with($value, 'HOSPEDAJE - OPCIÓN')) {
                         $sheet->getStyle('A'.$row->getRowIndex().':F'.$row->getRowIndex())->applyFromArray([
-                            'font' => ['bold' => true, 'size' => 13],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
+                            'font' => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'C55A11']],
                         ]);
                         $sheet->getStyle('A'.($row->getRowIndex() + 1).':F'.($row->getRowIndex() + 1))->applyFromArray([
-                            'font' => ['bold' => true],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
+                            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'ED7D31']],
                             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                         ]);
                     }
