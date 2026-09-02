@@ -1923,6 +1923,31 @@ class QuoteController extends Controller
         ]);
     }
 
+    public function updateAccommodationNotes(Request $request, Quote $quote, QuoteAccommodation $accommodation)
+    {
+        if ($accommodation->id_quote !== $quote->id_quote) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El hotel no pertenece a esta cotización.',
+            ], 404);
+        }
+
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:600',
+        ]);
+        $notes = trim((string) ($data['notes'] ?? ''));
+
+        QuoteAccommodation::where('id_quote', $quote->id_quote)
+            ->where('option_number', $accommodation->option_number)
+            ->where('id_service', $accommodation->id_service)
+            ->update(['notes' => $notes === '' ? null : $notes]);
+
+        return response()->json([
+            'success' => true,
+            'notes' => $notes,
+        ]);
+    }
+
     /**
      * Agregar un pasajero a la cotización
      */

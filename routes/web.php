@@ -196,6 +196,7 @@ Route::middleware('auth')->group(function () {
 
         Route::post('/{quote}/accommodation-to-day', [QuoteController::class, 'addAccommodationToDay'])->name('add-accommodation-to-day');
         Route::delete('/{quote}/accommodations/{accommodation}', [QuoteController::class, 'removeAccommodation'])->name('remove-accommodation');
+        Route::put('/{quote}/accommodations/{accommodation}/notes', [QuoteController::class, 'updateAccommodationNotes'])->name('update-accommodation-notes');
 
         // Pasajeros y asignaciones de alojamiento
         Route::post('/{quote}/passengers', [QuoteController::class, 'addPassenger'])->name('add-passenger');

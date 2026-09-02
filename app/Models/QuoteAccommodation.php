@@ -24,6 +24,7 @@ class QuoteAccommodation extends Model
         'room_count',
         'unit_price',
         'subtotal',
+        'notes',
     ];
 
     protected $casts = [

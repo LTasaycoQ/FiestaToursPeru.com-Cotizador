@@ -204,7 +204,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 .accommodation-empty i { font-size: 26px; display: block; margin-bottom: 6px; }
 
 /* ===== MODALES ===== */
-.modal { position: fixed !important; inset: 0; width: 100% !important; height: 100vh !important; z-index: 1050 !important; overflow-y: auto !important; background: rgba(15, 23, 42, .62); backdrop-filter: blur(6px); display: none; padding: 24px; align-items: center; justify-content: center; }
+.modal { position: fixed !important; inset: 0; width: 100% !important; z-index: 1050 !important; overflow-y: auto !important; background: rgba(15, 23, 42, .62); backdrop-filter: blur(6px); display: none; padding: 24px; align-items: center; justify-content: center; }
 .modal.show { display: flex !important; }
 .modal .modal-dialog { width: 100%; max-width: 900px; margin: 0; background-color:white; }
 .modal .modal-content { background: #fff; border-radius: var(--qe-radius-xl); box-shadow: var(--qe-shadow-lg); width:100%; max-height: 90vh; overflow-y: auto; }
@@ -324,7 +324,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <button class="btn btn-danger" onclick="confirmDelete({{ $quote->id_quote }}, '{{ addslashes($quote->name ?? 'Cotización') }}')">
                             <i class="ti ti-trash"></i> Eliminar
                         </button>
-                    </div>}
+                    </div>
                 </div>
 
                 <!-- ===== BODY ===== -->
@@ -772,6 +772,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     'dates' => [],
                                                     'accom_ids' => [],
                                                     'room_labels' => [],
+                                                    'notes' => $hotel->notes,
                                                 ];
                                             }
                                             $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
@@ -782,9 +783,12 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             $roomCount = (int) ($hotel->room_count ?? 1);
                                             $roomLabel = ucfirst($roomType) . ($roomCount > 1 ? ' x'.$roomCount : '');
                                             $groups[$sid]['room_labels'][] = $roomLabel;
+                                            $groups[$sid]['notes'] ??= $hotel->notes;
                                         }
                                     @endphp
-
+                                                        @if(!empty($group['notes']))
+                                                            <div class="accommodation-note" style="margin-top:6px; color:#dc2626; font-weight:700;">Nota: {{ $group['notes'] }}</div>
+                                                        @endif
                                     <div class="accommodation-groups">
                                         @foreach($groups as $sid => $group)
                                             @php
@@ -823,6 +827,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                         <div style="display:flex; gap:6px;">
                                                             <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg1_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
                                                             <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(1, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i></button>
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationNotes({{ $group['accom_ids'][array_key_first($group['accom_ids'])] }}, @js($group['notes'] ?? ''))" title="Agregar nota"><i class="ti ti-note"></i></button>
                                                             <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> </button>
                                                         </div>
                                                     </div>
@@ -893,12 +898,14 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     'days' => [],
                                                     'dates' => [],
                                                     'accom_ids' => [],
+                                                    'notes' => $hotel->notes,
                                                 ];
                                             }
                                             $groups2[$sid]['days'][] = $hotel->quoteDay->day_number;
                                             $groups2[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
                                             $groups2[$sid]['prices'][$hotel->quoteDay->day_number] = (float) $hotel->unit_price;
                                             $groups2[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
+                                            $groups2[$sid]['notes'] ??= $hotel->notes;
                                         }
                                     @endphp
 
@@ -934,6 +941,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 @endforeach
                                                             </div>
                                                         @endif
+                                                        @if(!empty($group['notes']))
+                                                            <div class="accommodation-note" style="margin-top:6px; color:#dc2626; font-weight:700;">Nota: {{ $group['notes'] }}</div>
+                                                        @endif
                                                         <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
                                                             @foreach($ranges as $r)
                                                                 @if($r[0] == $r[1])
@@ -950,6 +960,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                         <div style="display:flex; gap:6px;">
                                                             <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg2_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
                                                             <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal(2, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i> Habitaciones</button>
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationNotes({{ $group['accom_ids'][array_key_first($group['accom_ids'])] }}, @js($group['notes'] ?? ''))" title="Agregar nota"><i class="ti ti-note"></i></button>
                                                             <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> Eliminar</button>
                                                         </div>
                                                     </div>
@@ -1028,6 +1039,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     'dates' => [],
                                                     'accom_ids' => [],
                                                     'room_labels' => [],
+                                                    'notes' => $hotel->notes,
                                                 ];
                                             }
                                             $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
@@ -1038,6 +1050,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             $roomCount = (int) ($hotel->room_count ?? 1);
                                             $roomLabel = ucfirst($roomType) . ($roomCount > 1 ? ' x'.$roomCount : '');
                                             $groups[$sid]['room_labels'][] = $roomLabel;
+                                            $groups[$sid]['notes'] ??= $hotel->notes;
                                         }
                                     @endphp
 
@@ -1073,6 +1086,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 @endforeach
                                                             </div>
                                                         @endif
+                                                        @if(!empty($group['notes']))
+                                                            <div class="accommodation-note" style="margin-top:6px; color:#dc2626; font-weight:700;">Nota: {{ $group['notes'] }}</div>
+                                                        @endif
                                                         <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
                                                             @foreach($ranges as $r)
                                                                 @if($r[0] == $r[1])
@@ -1089,6 +1105,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                         <div style="display:flex; gap:6px;">
                                                             <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg{{ $optionNumber }}_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
                                                             <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i></button>
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationNotes({{ $group['accom_ids'][array_key_first($group['accom_ids'])] }}, @js($group['notes'] ?? ''))" title="Agregar nota"><i class="ti ti-note"></i></button>
                                                             <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> </button>
                                                         </div>
                                                     </div>
@@ -1286,7 +1303,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 </div>
 
 <div class="modal quote-edit-page" id="modalAddAccommodationToDay" tabindex="-1" style="display:none;">
-    <div class="modal-dialog" role="document" style="max-width: 720px;">
+    <div class="modal-dialog" role="document">
         <div class="modal-header">
             <h5 class="modal-title"><i class="ti ti-bed"></i> <span id="modalAccActionLabel">Registrar hotel</span> — Opción <span id="modalAccOptionLabel">1</span></h5>
             <button type="button" class="btn-close-modal" onclick="closeAccommodationToDayModal()"><i class="ti ti-x"></i></button>
@@ -1295,7 +1312,6 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
             <form id="addAccommodationToDayForm" autocomplete="off">
                 <input type="hidden" id="acc_option_number" name="option_number" value="1">
 
-                <div class="modal-section-label" style="margin-bottom:12px;"><i class="ti ti-search"></i> Seleccionar hotel</div>
                 <div id="accommodationDateFields" class="detail-edit-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;">
                     <div class="form-group">
                         <label for="acc_day_start_select">Día inicio</label>
@@ -1389,13 +1405,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         </tbody>
                     </table>
                 </div>
-                <div id="accommodationPagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:12px; flex-wrap:wrap;">
-                    <small id="accommodationPaginationMeta" style="color:var(--qe-ink-500);">Mostrando 0 resultados</small>
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" class="btn btn-light btn-sm" id="accommodationPrevPage" onclick="changeAccommodationPage(-1)"><i class="ti ti-chevron-left"></i> Anterior</button>
-                        <button type="button" class="btn btn-light btn-sm" id="accommodationNextPage" onclick="changeAccommodationPage(1)">Siguiente <i class="ti ti-chevron-right"></i></button>
-                    </div>
-                </div>
+              
 
                 <div id="accommodationSelectedService" style="display:none; margin-top:14px; padding:10px 12px; border:1px solid var(--qe-line); border-radius:8px; background:#f8fafc;">
                     <div style="font-weight:600;">Servicio: <span id="accommodationSelectedServiceName"></span></div>
@@ -1410,6 +1420,22 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="closeAccommodationToDayModal()">Cancelar</button>
             <button type="button" class="btn btn-primary" id="btnAddAccommodationToDay" onclick="addAccommodationToDay()"><i class="ti ti-plus"></i> <span id="btnAddAccommodationLabel">Guardar hotel</span></button>
+        </div>
+    </div>
+</div>
+
+<div class="modal quote-edit-page" id="modalEditAccommodationRooms" tabindex="-1" style="display:none;">
+    <div class="modal-dialog" role="document" style="max-width: 900px;">
+        <div class="modal-header">
+            <h5 class="modal-title"><i class="ti ti-bed"></i> Acomodación de habitaciones — Opción <span id="modalEditAccOptionLabel">1</span></h5>
+            <button type="button" class="btn-close-modal" onclick="closeAccommodationToDayModal()"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="roomEditAccommodationHost"></div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeAccommodationToDayModal()">Cancelar</button>
+            <button type="button" class="btn btn-primary" onclick="addAccommodationToDay()"><i class="ti ti-device-floppy"></i> Guardar acomodación</button>
         </div>
     </div>
 </div>
@@ -1492,6 +1518,7 @@ const UPDATE_DAY_URL_BASE = '{{ route("admin.quotes.update-day", [$quote->id_quo
 const REMOVE_SERVICE_URL_BASE = '{{ route("admin.quotes.remove-service", [$quote->id_quote, "__ID__"]) }}';
 const ADD_ACCOMMODATION_TO_DAY_URL = '{{ route("admin.quotes.add-accommodation-to-day", $quote->id_quote) }}';
 const REMOVE_ACCOMMODATION_URL_BASE = '{{ route("admin.quotes.remove-accommodation", [$quote->id_quote, "__ID__"]) }}';
+const UPDATE_ACCOMMODATION_NOTES_URL_BASE = '{{ route("admin.quotes.update-accommodation-notes", [$quote->id_quote, "__ID__"]) }}';
 const accommodationTariffs = @json($accommodationTariffs);
 const accommodationSeasonOptions = @json($accommodationSeasonOptions);
 const accommodationDays = @json($quote->quoteDays->pluck('day_number')->values());
@@ -1505,6 +1532,8 @@ let currentOccupancyAccommodationId = null;
 let currentOccupancyAccommodationIds = [];
 let currentOccupancyLabel = '';
 let accommodationEditingExisting = false;
+let roomTypesOriginalParent = null;
+let roomTypesOriginalNextSibling = null;
 
 function openQuoteContactModal() {
     const clientId = document.getElementById('id_client').value;
@@ -1617,6 +1646,7 @@ function openServiceNotes(detailId, currentNotes = '') {
             if (value !== null && value.length > 600) {
                 return 'La nota no puede exceder 600 caracteres.';
             }
+
             return null;
         }
     }).then((result) => {
@@ -1648,6 +1678,47 @@ function openServiceNotes(detailId, currentNotes = '') {
                 }
 
                 Swal.fire({ icon: 'success', title: 'Nota guardada', timer: 1000, showConfirmButton: false });
+            })
+            .catch(error => {
+                Swal.fire({ icon: 'error', title: 'Error', text: error.message });
+            });
+    });
+}
+
+function openAccommodationNotes(accommodationId, currentNotes = '') {
+    Swal.fire({
+        title: 'Nota del hotel',
+        input: 'textarea',
+        inputLabel: 'Esta nota se aplicará a todos los días de este hotel',
+        inputValue: currentNotes,
+        inputAttributes: { maxlength: 600 },
+        showCancelButton: true,
+        confirmButtonText: 'Guardar nota',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#6366f1',
+        inputValidator: (value) => value.length > 600 ? 'La nota no puede exceder 600 caracteres.' : null,
+    }).then((result) => {
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('_token', CSRF_TOKEN);
+        formData.append('_method', 'PUT');
+        formData.append('notes', result.value ?? '');
+
+        fetch(UPDATE_ACCOMMODATION_NOTES_URL_BASE.replace('__ID__', accommodationId), {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
+            body: formData,
+        })
+            .then(response => response.json().then(data => ({ ok: response.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data.success) {
+                    throw new Error(data.message || 'No se pudo guardar la nota del hotel.');
+                }
+
+                window.location.reload();
             })
             .catch(error => {
                 Swal.fire({ icon: 'error', title: 'Error', text: error.message });
@@ -2471,9 +2542,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function closeAccommodationToDayModal() {
     const modal = document.getElementById('modalAddAccommodationToDay');
+    const roomModal = document.getElementById('modalEditAccommodationRooms');
+    const typesPanel = document.getElementById('accommodationRoomTypes');
+    if (typesPanel && roomTypesOriginalParent) {
+        roomTypesOriginalParent.insertBefore(typesPanel, roomTypesOriginalNextSibling);
+    }
+    roomTypesOriginalParent = null;
+    roomTypesOriginalNextSibling = null;
     if (!modal) return;
     modal.style.display = 'none';
     modal.classList.remove('show');
+    if (roomModal) {
+        roomModal.style.display = 'none';
+        roomModal.classList.remove('show');
+    }
     document.body.style.overflow = '';
 
     const form = document.getElementById('addAccommodationToDayForm');
@@ -2706,11 +2788,11 @@ function renderAccommodationRoomMatrix() {
     }
 
     const roomConfigurations = [
-        { key: 'simple', label: 'N° de Hab. Simple', detail: '1 cama', tariffCode: 'SPL' },
-        { key: 'doble_1_cama', label: 'N° de Hab. Doble con 1 cama', detail: '1 cama doble', tariffCode: 'DBL' },
-        { key: 'doble_2_camas', label: 'N° de Hab. Doble con 2 camas', detail: '2 camas', tariffCode: 'DBL' },
-        { key: 'triple', label: 'N° de Hab. Triple', detail: '3 camas', tariffCode: 'TPL' },
-        { key: 'triple_1_doble', label: 'N° de Hab. Triple con 1 cama doble', detail: '1 cama doble + 1 cama', tariffCode: 'TPL' },
+        { key: 'simple', label: 'N° de Hab. Simple', tariffCode: 'SPL' },
+        { key: 'doble_1_cama', label: 'N° de Hab. Doble con 1 cama', tariffCode: 'DBL' },
+        { key: 'doble_2_camas', label: 'N° de Hab. Doble con 2 camas', tariffCode: 'DBL' },
+        { key: 'triple', label: 'N° de Hab. Triple', tariffCode: 'TPL' },
+        { key: 'triple_1_doble', label: 'N° de Hab. Triple con 1 cama doble', tariffCode: 'TPL' },
     ];
     const tariffByCode = tariffs.reduce((result, tariff) => {
         const code = roomTariffCode(tariff.name);
@@ -2725,8 +2807,7 @@ function renderAccommodationRoomMatrix() {
             <table style="width:100%; min-width:760px; border-collapse:collapse;">
                 <thead>
                     <tr>
-                        <th style="padding:8px; text-align:left;">Configuración de habitación</th>
-                        <th style="padding:8px; text-align:left;">Tarifa</th>
+                        <th style="padding:8px; text-align:left;"></th>
                         ${columns.map(day => `<th style="padding:8px; text-align:center;">${day === 'all' ? 'Todos los días' : 'Día ' + day}</th>`).join('')}
                     </tr>
                 </thead>
@@ -2752,12 +2833,9 @@ function renderAccommodationRoomMatrix() {
                         <tr>
                             <td style="padding:8px; border-top:1px solid var(--qe-line);">
                                 <strong>${configuration.label}</strong>
-                                <br><small style="color:var(--qe-ink-500);">${configuration.detail}</small>
+                                <br><small style="color:var(--qe-ink-500);"> ${Number(tariff.price).toFixed(2)}</small>
                             </td>
-                            <td style="padding:8px; border-top:1px solid var(--qe-line); white-space:nowrap;">
-                                <strong>${configuration.tariffCode}</strong>
-                                <br><small style="color:var(--qe-ink-500);">$ ${Number(tariff.price).toFixed(2)}</small>
-                            </td>
+                           
                             ${columns.map(day => `
                                 <td style="padding:8px; border-top:1px solid var(--qe-line);">
                                     <input type="number" min="0" value="0" class="form-control accommodation-room-count"
@@ -3010,6 +3088,7 @@ function removeAccommodationGroup(ids) {
 
 function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd, serviceId = null) {
     const modal = document.getElementById('modalAddAccommodationToDay');
+    const roomModal = document.getElementById('modalEditAccommodationRooms');
     const form = document.getElementById('addAccommodationToDayForm');
     const accOptionInput = document.getElementById('acc_option_number');
     const optionLabel = document.getElementById('modalAccOptionLabel');
@@ -3045,6 +3124,21 @@ function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd, 
     modal.classList.add('show');
     document.body.style.overflow = 'hidden';
     if (serviceId) {
+        const typesPanel = document.getElementById('accommodationRoomTypes');
+        const roomHost = document.getElementById('roomEditAccommodationHost');
+        if (typesPanel && roomHost) {
+            roomTypesOriginalParent = typesPanel.parentElement;
+            roomTypesOriginalNextSibling = typesPanel.nextElementSibling;
+            roomHost.appendChild(typesPanel);
+        }
+        modal.style.display = 'none';
+        modal.classList.remove('show');
+        if (roomModal) {
+            roomModal.style.display = 'flex';
+            roomModal.classList.add('show');
+        }
+        const editOptionLabel = document.getElementById('modalEditAccOptionLabel');
+        if (editOptionLabel) editOptionLabel.textContent = optionNumber;
         const serviceSelect = document.getElementById('accommodation_service_select');
         const catalog = document.getElementById('accommodationServiceCatalog');
         const selectedService = document.getElementById('accommodationSelectedService');
