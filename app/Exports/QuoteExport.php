@@ -11,7 +11,9 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
@@ -38,7 +40,12 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             ];
         }
 
-        return ['DÍA', 'SERVICIO', 'PAX', 'PRECIO UNITARIO', 'SUBTOTAL'];
+        return [
+            ['FECHA DE GENERACIÓN', now()->format('d/m/Y H:i'), '', ''],
+            ['', '', '', ''],
+            ['SERVICIOS', '', '', ''],
+            ['DÍA', 'SERVICIO', 'PRECIO UNITARIO', 'SUBTOTAL'],
+        ];
     }
 
     public function collection(): Collection
@@ -47,7 +54,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             'quoteDays.details.service.tariffs.subCategory',
             'quoteDays.details.tariff.subCategory',
             'accommodations.quoteDay',
-            'accommodations.service',
+            'accommodations.service.supplier',
             'accommodations.tariff.subCategory',
         ])->findOrFail($this->quoteId);
 
@@ -109,7 +116,6 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 $rows->push([
                     'Día '.$day->day_number,
                     $serviceName,
-                    $quantity,
                     $unitPrice,
                     $subtotal,
                 ]);
@@ -118,11 +124,52 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             }
         }
 
-        $rows->push(['', '', '', 'TOTAL GENERAL', $grandSubtotal]);
-        $rows->push(['', '', '', 'N° PASAJEROS', $passengers]);
-        $rows->push(['', '', '', 'TOTAL X PASAJEROS', $grandSubtotal * $passengers]);
+        $rows->push(['', '', 'TOTAL GENERAL', $grandSubtotal]);
+        $rows->push(['', '', 'N° PASAJEROS', $passengers]);
+        $rows->push(['', '', 'TOTAL X PASAJEROS', $grandSubtotal * $passengers]);
+
+        $accommodationsByOption = $quote->accommodations
+            ->sortBy([
+                ['option_number', 'asc'],
+                ['quoteDay.day_number', 'asc'],
+                ['id_quote_accommodation', 'asc'],
+            ])
+            ->groupBy(fn ($accommodation) => (int) ($accommodation->option_number ?: 1));
+
+        foreach ($accommodationsByOption as $optionNumber => $accommodations) {
+            $rows->push(['', '', '', '']);
+            $rows->push(['HOSPEDAJE - OPCIÓN '.$optionNumber, '', '', '', '', '']);
+            $rows->push(['DÍA', 'HOTEL', 'TIPO DE HABITACIÓN', 'N° HABITACIONES', 'PRECIO UNITARIO', 'SUBTOTAL']);
+
+            $optionSubtotal = 0;
+            foreach ($accommodations as $accommodation) {
+                $subtotal = (float) ($accommodation->subtotal ?? 0);
+                $optionSubtotal += $subtotal;
+                $rows->push([
+                    $accommodation->quoteDay ? 'Día '.$accommodation->quoteDay->day_number : '',
+                    $this->hotelCell($accommodation),
+                    $accommodation->tariff?->subCategory?->name ?? ucfirst($accommodation->room_type ?? 'Sin tipo'),
+                    (int) ($accommodation->room_count ?? 0),
+                    (float) ($accommodation->unit_price ?? 0),
+                    $subtotal,
+                ]);
+            }
+
+            $rows->push(['', '', '', '', 'TOTAL OPCIÓN '.$optionNumber, $optionSubtotal]);
+        }
 
         return $rows;
+    }
+
+    private function hotelCell(mixed $accommodation): RichText
+    {
+        $hotelName = $accommodation->service?->supplier?->supplier_name ?? 'Hotel no especificado';
+        $serviceName = $accommodation->service?->name_service ?? 'Servicio eliminado';
+        $richText = new RichText;
+        $richText->createTextRun($hotelName)->getFont()->setBold(true);
+        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF808080'));
+
+        return $richText;
     }
 
     public function styles(Worksheet $sheet): array
@@ -145,10 +192,18 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         return [
             1 => [
                 'font' => ['bold' => true],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'D9EAF7']],
+            ],
+            3 => [
+                'font' => ['bold' => true, 'size' => 14],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '737070']],
+            ],
+            4 => [
+                'font' => ['bold' => true],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E2F0D9']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
-            'A2:E'.($sheet->getHighestRow()) => [
+            'A1:F'.$sheet->getHighestRow() => [
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT],
             ],
         ];
@@ -156,22 +211,37 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
     public function registerEvents(): array
     {
-        if ($this->mode !== 'tariff') {
-            return [];
-        }
-
         return [
             AfterSheet::class => function (AfterSheet $event): void {
                 $sheet = $event->sheet->getDelegate();
-                $sheet->mergeCells('A1:A2');
-                $sheet->mergeCells('B1:B2');
-                $sheet->mergeCells('C1:C2');
-                $sheet->mergeCells('D1:E1');
-                $sheet->mergeCells('F1:G1');
-                $sheet->mergeCells('H1:P1');
-                $sheet->getRowDimension(1)->setRowHeight(28);
-                $sheet->getRowDimension(2)->setRowHeight(22);
-                $sheet->freezePane('D3');
+                if ($this->mode === 'tariff') {
+                    $sheet->mergeCells('A1:A2');
+                    $sheet->mergeCells('B1:B2');
+                    $sheet->mergeCells('C1:C2');
+                    $sheet->mergeCells('D1:E1');
+                    $sheet->mergeCells('F1:G1');
+                    $sheet->mergeCells('H1:P1');
+                    $sheet->getRowDimension(1)->setRowHeight(28);
+                    $sheet->getRowDimension(2)->setRowHeight(22);
+                    $sheet->freezePane('D3');
+
+                    return;
+                }
+
+                foreach ($sheet->getRowIterator() as $row) {
+                    $value = (string) $sheet->getCell('A'.$row->getRowIndex())->getValue();
+                    if (str_starts_with($value, 'HOSPEDAJE - OPCIÓN')) {
+                        $sheet->getStyle('A'.$row->getRowIndex().':F'.$row->getRowIndex())->applyFromArray([
+                            'font' => ['bold' => true, 'size' => 13],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
+                        ]);
+                        $sheet->getStyle('A'.($row->getRowIndex() + 1).':F'.($row->getRowIndex() + 1))->applyFromArray([
+                            'font' => ['bold' => true],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
+                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                        ]);
+                    }
+                }
             },
         ];
     }

@@ -1566,28 +1566,9 @@ class QuoteController extends Controller
                 $dayTariffs = Tariff::with('subCategory')
                     ->where('id_service', $service->id_service)
                     ->where('status', 'active')
-                    ->whereIn('id_tariff', $tariffIds)
                     ->when($daySeasonId !== null, fn ($query) => $query->where('id_season', $daySeasonId), fn ($query) => $query->whereNull('id_season'))
                     ->get()
                     ->keyBy('id_tariff');
-
-                if ($dayTariffs->count() !== $tariffIds->count()) {
-                    $fallbackQuery = Tariff::with('subCategory')
-                        ->where('id_service', $service->id_service)
-                        ->where('status', 'active')
-                        ->whereIn('id_tariff', $tariffIds)
-                        ->where(function ($query) use ($selectedSeasonId) {
-                            $query->when($selectedSeasonId !== null, fn ($seasonQuery) => $seasonQuery->where('id_season', $selectedSeasonId), fn ($seasonQuery) => $seasonQuery->whereNull('id_season'));
-                        });
-                    $dayTariffs = $fallbackQuery->get()->keyBy('id_tariff');
-                }
-
-                if ($dayTariffs->count() !== $tariffIds->count()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Una o más tarifas no pertenecen al hotel seleccionado para la fecha del día '.$dayNumber.'.',
-                    ], 422);
-                }
 
                 QuoteAccommodation::where('id_quote', $quote->id_quote)
                     ->where('option_number', $data['option_number'])
@@ -1620,6 +1601,16 @@ class QuoteController extends Controller
                     $tariffId = $allocation['tariff_id'];
                     $roomCount = $allocation['count'];
                     $selectedTariff = $dayTariffs->get($tariffId);
+                    if (! $selectedTariff && $allocation['configuration']) {
+                        $selectedTariff = $dayTariffs->first(function (Tariff $tariff) use ($allocation): bool {
+                            $tariffRoomType = $this->normalizeRoomType($tariff->subCategory?->name);
+                            $configuration = (string) $allocation['configuration'];
+
+                            return $tariffRoomType === $this->normalizeRoomType($configuration)
+                                || (str_starts_with($configuration, 'doble_') && $tariffRoomType === 'doble')
+                                || (str_starts_with($configuration, 'triple_') && $tariffRoomType === 'triple');
+                        });
+                    }
                     if (! $selectedTariff) {
                         continue;
                     }
