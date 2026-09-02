@@ -540,21 +540,29 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                 </div>
                                 <div class="form-group" style="margin-top:16px;">
                                     <label>Acomodación para todos los hoteles</label>
-                                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+                                    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;">
                                         <div>
-                                            <small>Simples (SPL)</small>
+                                            <small>N° de Hab. Simple (SPL)</small>
                                             <input type="number" class="form-control quote-room-count" name="room_counts[simple]" min="0" value="0">
                                         </div>
                                         <div>
-                                            <small>Dobles (DBL)</small>
-                                            <input type="number" class="form-control quote-room-count" name="room_counts[doble]" min="0" value="0">
+                                            <small>Doble con 1 cama (DBL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[doble_1_cama]" min="0" value="0">
                                         </div>
                                         <div>
-                                            <small>Triples (TPL)</small>
+                                            <small>Doble con 2 camas (DBL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[doble_2_camas]" min="0" value="0">
+                                        </div>
+                                        <div>
+                                            <small>N° de Hab. Triple (TPL)</small>
                                             <input type="number" class="form-control quote-room-count" name="room_counts[triple]" min="0" value="0">
                                         </div>
+                                        <div>
+                                            <small>Triple con 1 cama doble (TPL)</small>
+                                            <input type="number" class="form-control quote-room-count" name="room_counts[triple_1_doble]" min="0" value="0">
+                                        </div>
                                     </div>
-                                    <small style="display:block; color:var(--qe-ink-500); margin-top:6px;">Esta distribución se aplicará a todos los hoteles de las opciones. La asignación individual de pasajeros se hará después.</small>
+                                    <small style="display:block; color:var(--qe-ink-500); margin-top:6px;">Cada configuración se guarda por separado. Las variantes dobles usan DBL y las variantes triples usan TPL.</small>
                                 </div>
                                 <div class="form-actions" style="justify-content:flex-end;">
                                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('quotePricingModal').style.display='none'">Cancelar</button>
@@ -732,44 +740,18 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                     <div class="accommodation-section">
                         <div class="itinerary-header">
                             <h4 class="title">
-                                   <i class="ti ti-bed"></i> Hospedaje — opciones
+                                  <i class="ti ti-bed"></i> Hospedaje — opciones
                                 <span style="font-size:12px; font-weight:400; color:var(--qe-ink-500);">
                                     (cada día puede tener hotel diferente)
                                 </span>
                             </h4>
                             <button type="button" class="btn btn-primary btn-sm" onclick="openNextAccommodationOption()">
-                                <i class="ti ti-plus"></i> Nueva opción
+                                <i class="ti ti-plus"></i> Agregar otra opción
                             </button>
                         </div>
 
-                        @php
-                            $additionalAccommodationOptions = $quote->accommodations
-                                ->groupBy('option_number')
-                                ->filter(fn ($accommodations, $option) => (int) $option > 2);
-                        @endphp
-                        @foreach($additionalAccommodationOptions as $optionNumber => $optionAccommodations)
-                            <div class="accommodation-option has-hotel" id="accOption{{ $optionNumber }}">
-                                <div class="option-label"><i class="ti ti-number"></i> Opción {{ $optionNumber }}</div>
-                                <div class="accommodation-groups">
-                                    @foreach($optionAccommodations->groupBy('id_service') as $serviceAccommodations)
-                                        @php $firstAccommodation = $serviceAccommodations->first(); @endphp
-                                        <div class="accommodation-group">
-                                            <div class="group-summary">
-                                                <div style="flex:1; min-width:0;">
-                                                    <div style="font-weight:700;">{{ $firstAccommodation->service->name_service ?? 'Hotel eliminado' }}</div>
-                                                    <div style="font-size:12px; color:var(--qe-ink-500);">Días {{ $serviceAccommodations->min('quoteDay.day_number') }} al {{ $serviceAccommodations->max('quoteDay.day_number') }}</div>
-                                                </div>
-                                                <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, null, {{ $serviceAccommodations->min('quoteDay.day_number') }}, {{ $serviceAccommodations->max('quoteDay.day_number') }}, {{ $firstAccommodation->id_service }})">
-                                                    <i class="ti ti-edit"></i> Habitaciones
-                                                </button>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
-
                         <div class="accommodation-grid">
+                            @if($quote->accommodationOption1->count() > 0)
                             <!-- OPCIÓN 1 -->
                             <div class="accommodation-option {{ $quote->accommodationOption1->count() > 0 ? 'has-hotel' : '' }}" id="accOption1">
                                 <div class="option-label"><i class="ti ti-number-1"></i> Opción 1</div>
@@ -890,7 +872,9 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     </button>
                                 @endif
                             </div>
+                            @endif
 
+                            @if($quote->accommodationOption2->count() > 0)
                             <div class="accommodation-option {{ $quote->accommodationOption2->count() > 0 ? 'has-hotel' : '' }}" id="accOption2">
                                 <div class="option-label"><i class="ti ti-number-2"></i> Opción 2</div>
                                 @php $hotelsOption2 = $quote->accommodationOption2->sortBy('quoteDay.day_number'); @endphp
@@ -1015,7 +999,138 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                     </button>
                                 @endif
                             </div>
+                            @endif
                         </div>
+
+                        @php
+                            $additionalAccommodationOptions = $quote->accommodations
+                                ->groupBy('option_number')
+                                ->filter(fn ($accommodations, $option) => (int) $option > 2)
+                                ->sortKeys();
+                        @endphp
+                        @foreach($additionalAccommodationOptions as $optionNumber => $optionAccommodations)
+                            @php $optionHotels = $optionAccommodations->sortBy('quoteDay.day_number'); @endphp
+                            @if($optionHotels->count() > 0)
+                                <div class="accommodation-option has-hotel" id="accOption{{ $optionNumber }}">
+                                    <div class="option-label"><i class="ti ti-number"></i> Opción {{ $optionNumber }}</div>
+                                    @php
+                                        $groups = [];
+                                        foreach($optionHotels as $hotel) {
+                                            if (! $hotel->quoteDay || ! $hotel->quoteDay->day_number) {
+                                                continue;
+                                            }
+                                            $sid = $hotel->id_service ?? 's'.$hotel->id_quote_accommodation;
+                                            if (! isset($groups[$sid])) {
+                                                $groups[$sid] = [
+                                                    'service' => $hotel->service,
+                                                    'prices' => [],
+                                                    'days' => [],
+                                                    'dates' => [],
+                                                    'accom_ids' => [],
+                                                    'room_labels' => [],
+                                                ];
+                                            }
+                                            $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
+                                            $groups[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
+                                            $groups[$sid]['prices'][$hotel->quoteDay->day_number] = (float) $hotel->unit_price;
+                                            $groups[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
+                                            $roomType = $hotel->room_type ?? 'simple';
+                                            $roomCount = (int) ($hotel->room_count ?? 1);
+                                            $roomLabel = ucfirst($roomType) . ($roomCount > 1 ? ' x'.$roomCount : '');
+                                            $groups[$sid]['room_labels'][] = $roomLabel;
+                                        }
+                                    @endphp
+
+                                    <div class="accommodation-groups">
+                                        @foreach($groups as $sid => $group)
+                                            @php
+                                                $days = $group['days'];
+                                                sort($days);
+                                                $ranges = [];
+                                                $start = null; $prev = null;
+                                                foreach($days as $d) {
+                                                    if ($start === null) { $start = $prev = $d; }
+                                                    elseif ($d == $prev + 1) { $prev = $d; }
+                                                    else { $ranges[] = [$start,$prev]; $start = $prev = $d; }
+                                                }
+                                                if ($start !== null) $ranges[] = [$start,$prev];
+                                                $min = min($days);
+                                                $max = max($days);
+                                                $uniquePrices = array_values(array_unique($group['prices']));
+                                                $priceDisplay = count($uniquePrices) === 1 ? number_format($uniquePrices[0], 2) : null;
+                                            @endphp
+
+                                            <div class="accommodation-group" style="border:1px solid var(--qe-line); border-radius:8px; padding:10px; margin-bottom:10px;">
+                                                <div class="group-summary" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                                                    <div style="flex:1; min-width:0;">
+                                                        <div style="font-weight:700;">{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</div>
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:2px;">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</div>
+                                                        @php $uniqueRoomLabels = array_values(array_unique($group['room_labels'] ?? [])); @endphp
+                                                        @if(!empty($uniqueRoomLabels))
+                                                            <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
+                                                                @foreach($uniqueRoomLabels as $label)
+                                                                    <span class="badge" style="display:inline-block; margin-right:6px; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3;">{{ $label }}</span>
+                                                                @endforeach
+                                                            </div>
+                                                        @endif
+                                                        <div style="font-size:12px; color:var(--qe-ink-500); margin-top:6px;">
+                                                            @foreach($ranges as $r)
+                                                                @if($r[0] == $r[1])
+                                                                    <span>Día {{ $r[0] }} ({{ $group['dates'][$r[0]] }})</span>
+                                                                @else
+                                                                    <span>Día {{ $r[0] }}–{{ $r[1] }} ({{ $group['dates'][$r[0]] }} – {{ $group['dates'][$r[1]] }})</span>
+                                                                @endif
+                                                                @if(! $loop->last) <span style="margin:0 8px;">•</span> @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                    <div style="display:flex; gap:8px; align-items:center;">
+                                                        <div style="min-width:80px; text-align:right; font-weight:600;">@if($priceDisplay) $ {{ $priceDisplay }} @else Varios precios @endif</div>
+                                                        <div style="display:flex; gap:6px;">
+                                                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAccommodationGroup('accg{{ $optionNumber }}_{{ $sid }}')"><i class="ti ti-chevron-down"></i> Ver días</button>
+                                                            <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, null, {{ $min }}, {{ $max }}, {{ $group['service']->id_service }})"><i class="ti ti-edit"></i></button>
+                                                            <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodationGroup(@json(array_values($group['accom_ids'])))"><i class="ti ti-trash"></i> </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="group-days" id="accg{{ $optionNumber }}_{{ $sid }}" style="display:none; margin-top:10px;">
+                                                    <div class="accommodation-days-grid">
+                                                        @foreach($days as $d)
+                                                            <div class="accommodation-day-item" id="acc-{{ $group['accom_ids'][$d] }}">
+                                                                <div class="day-info">
+                                                                    <span class="day-number">Día {{ $d }}</span>
+                                                                    <span class="day-date">{{ $group['dates'][$d] }}</span>
+                                                                </div>
+                                                                <div class="day-hotel">
+                                                                    <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
+                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
+                                                                </div>
+                                                                <div class="day-actions">
+                                                                    <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">
+                                                                        <i class="ti ti-edit"></i>
+                                                                    </button>
+                                                                    <button type="button" class="btn btn-danger btn-sm" onclick="removeAccommodation({{ $group['accom_ids'][$d] }})" title="Eliminar">
+                                                                        <i class="ti ti-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+
+                                    <div style="margin-top:10px;">
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="openAccommodationToDayModal({{ $optionNumber }}, null)">
+                                            <i class="ti ti-plus"></i> Agregar/Reemplazar hotel
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+
                     </div>
 
                     </div>
@@ -1342,7 +1457,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
     $existingRoomAllocations = $quote->accommodations
         ->filter(fn ($accommodation) => $accommodation->id_tariff && $accommodation->quoteDay)
         ->mapWithKeys(fn ($accommodation) => [
-            $accommodation->option_number . ':' . $accommodation->id_service . ':' . $accommodation->quoteDay->day_number . ':' . $accommodation->id_tariff
+            $accommodation->option_number . ':' . $accommodation->id_service . ':' . $accommodation->quoteDay->day_number . ':' . $accommodation->id_tariff . ':' . ($accommodation->room_type ?? '')
                 => (int) $accommodation->room_count,
         ]);
 
@@ -2515,6 +2630,44 @@ function onAccommodationServiceSelect(serviceName = null, dayNumber = null) {
     preview.innerHTML = '<strong>' + (serviceName || document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${select.value}"]`)?.textContent?.trim() || 'Hotel') + '</strong>: define cuántas habitaciones usarás por tipo y por día.';
 }
 
+function roomTariffCode(name) {
+    const normalized = String(name || '').toUpperCase();
+
+    if (normalized.includes('SPL') || normalized.includes('SIMPLE') || normalized.includes('SINGLE')) {
+        return 'SPL';
+    }
+
+    if (normalized.includes('DBL') || normalized.includes('DOBLE') || normalized.includes('DOUBLE')) {
+        return 'DBL';
+    }
+
+    if (normalized.includes('TPL') || normalized.includes('TRIPLE')) {
+        return 'TPL';
+    }
+
+    return String(name || 'Tarifa');
+}
+
+function roomConfigurationLabel(name) {
+    const code = roomTariffCode(name);
+
+    return {
+        SPL: 'N° de hab. simple',
+        DBL: 'N° de hab. doble',
+        TPL: 'N° de hab. triple',
+    }[code] || 'N° de habitaciones';
+}
+
+function roomConfigurationDetails(name) {
+    const code = roomTariffCode(name);
+
+    return {
+        SPL: '1 cama — precio SPL',
+        DBL: '1 cama doble o 2 camas — precio DBL',
+        TPL: '3 camas o 1 cama doble + 1 cama — precio TPL',
+    }[code] || 'Selecciona la cantidad de habitaciones';
+}
+
 function renderAccommodationRoomMatrix() {
     const serviceSelect = document.getElementById('accommodation_service_select');
     const rows = document.getElementById('accommodationRoomTypeRows');
@@ -2552,31 +2705,69 @@ function renderAccommodationRoomMatrix() {
         preview.innerHTML = `<strong>${document.querySelector(`#accommodationListTableBody .accommodation-row[data-service-id="${serviceId}"]`)?.textContent?.trim() || 'Hotel'}</strong><br><span style="color:var(--qe-ink-500);">Temporada: ${escapeHtml(seasonName)}</span><br>${priceSummary}`;
     }
 
+    const roomConfigurations = [
+        { key: 'simple', label: 'N° de Hab. Simple', detail: '1 cama', tariffCode: 'SPL' },
+        { key: 'doble_1_cama', label: 'N° de Hab. Doble con 1 cama', detail: '1 cama doble', tariffCode: 'DBL' },
+        { key: 'doble_2_camas', label: 'N° de Hab. Doble con 2 camas', detail: '2 camas', tariffCode: 'DBL' },
+        { key: 'triple', label: 'N° de Hab. Triple', detail: '3 camas', tariffCode: 'TPL' },
+        { key: 'triple_1_doble', label: 'N° de Hab. Triple con 1 cama doble', detail: '1 cama doble + 1 cama', tariffCode: 'TPL' },
+    ];
+    const tariffByCode = tariffs.reduce((result, tariff) => {
+        const code = roomTariffCode(tariff.name);
+        if (!result[code]) {
+            result[code] = tariff;
+        }
+        return result;
+    }, {});
+
     rows.innerHTML = `
         <div style="overflow-x:auto;">
-            <table style="width:100%; min-width:560px; border-collapse:collapse;">
+            <table style="width:100%; min-width:760px; border-collapse:collapse;">
                 <thead>
                     <tr>
-                        <th style="padding:8px; text-align:left;">Tipo de habitación</th>
+                        <th style="padding:8px; text-align:left;">Configuración de habitación</th>
+                        <th style="padding:8px; text-align:left;">Tarifa</th>
                         ${columns.map(day => `<th style="padding:8px; text-align:center;">${day === 'all' ? 'Todos los días' : 'Día ' + day}</th>`).join('')}
                     </tr>
                 </thead>
                 <tbody>
-                    ${tariffs.map(tariff => `
+                    ${roomConfigurations.map(configuration => {
+                        const tariff = tariffByCode[configuration.tariffCode];
+
+                        if (!tariff) {
+                            return `
+                                <tr>
+                                    <td style="padding:8px; border-top:1px solid var(--qe-line);">
+                                        <strong>${configuration.label}</strong>
+                                        <br><small style="color:var(--qe-ink-500);">${configuration.detail}</small>
+                                    </td>
+                                    <td colspan="${columns.length + 1}" style="padding:8px; border-top:1px solid var(--qe-line); color:var(--qe-ink-500);">
+                                        No hay tarifa ${configuration.tariffCode} activa
+                                    </td>
+                                </tr>
+                            `;
+                        }
+
+                        return `
                         <tr>
                             <td style="padding:8px; border-top:1px solid var(--qe-line);">
-                                <strong>${escapeHtml(tariff.name)}</strong><br>
-                                <small style="color:var(--qe-ink-500);">$ ${Number(tariff.price).toFixed(2)}</small>
+                                <strong>${configuration.label}</strong>
+                                <br><small style="color:var(--qe-ink-500);">${configuration.detail}</small>
+                            </td>
+                            <td style="padding:8px; border-top:1px solid var(--qe-line); white-space:nowrap;">
+                                <strong>${configuration.tariffCode}</strong>
+                                <br><small style="color:var(--qe-ink-500);">$ ${Number(tariff.price).toFixed(2)}</small>
                             </td>
                             ${columns.map(day => `
                                 <td style="padding:8px; border-top:1px solid var(--qe-line);">
                                     <input type="number" min="0" value="0" class="form-control accommodation-room-count"
-                                        data-tariff-id="${tariff.id_tariff}" data-day="${day}"
-                                        name="room_allocations[${day}][${tariff.id_tariff}]">
+                                        data-tariff-id="${tariff.id_tariff}" data-day="${day}" data-room-configuration="${configuration.key}"
+                                        name="room_configurations[${day}][${configuration.key}][${tariff.id_tariff}]">
                                 </td>
                             `).join('')}
                         </tr>
-                    `).join('')}
+                    `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -2584,7 +2775,7 @@ function renderAccommodationRoomMatrix() {
 
     rows.querySelectorAll('input[data-day="all"]').forEach(input => {
         input.addEventListener('input', () => {
-            rows.querySelectorAll(`input[data-tariff-id="${input.dataset.tariffId}"]:not([data-day="all"])`)
+            rows.querySelectorAll(`input[data-tariff-id="${input.dataset.tariffId}"][data-room-configuration="${input.dataset.roomConfiguration}"]:not([data-day="all"])`)
                 .forEach(dayInput => dayInput.value = input.value);
         });
     });
@@ -2681,6 +2872,22 @@ function addAccommodationToDay() {
     formData.delete('room_type');
     formData.delete('room_count');
     formData.delete('auto_allocate');
+    formData.delete('room_allocations');
+
+    document.querySelectorAll('#accommodationRoomTypeRows .accommodation-room-count').forEach(input => {
+        const count = Number(input.value || 0);
+        const tariffId = input.dataset.tariffId;
+        const day = input.dataset.day;
+        const configuration = input.dataset.roomConfiguration;
+
+        if (!tariffId || !configuration || count <= 0) {
+            return;
+        }
+
+        const fieldName = `room_configurations[${day}][${configuration}][${tariffId}]`;
+        formData.set(fieldName, String(count));
+    });
+
     fetch(ADD_ACCOMMODATION_TO_DAY_URL, {
         method: 'POST',
         headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
@@ -2883,13 +3090,14 @@ function prefillAccommodationRoomMatrix(optionNumber, serviceId, start, end) {
     rows.querySelectorAll('.accommodation-room-count').forEach(input => {
         const day = input.dataset.day;
         if (day === 'all') return;
-        const key = `${optionNumber}:${serviceId}:${day}:${input.dataset.tariffId}`;
+        const key = `${optionNumber}:${serviceId}:${day}:${input.dataset.tariffId}:${input.dataset.roomConfiguration || ''}`;
         input.value = existingRoomAllocations[key] || 0;
     });
 
     rows.querySelectorAll('input[data-day="all"]').forEach(input => {
         const tariffId = input.dataset.tariffId;
-        const values = Array.from(rows.querySelectorAll(`input[data-tariff-id="${tariffId}"]:not([data-day="all"])`))
+        const configuration = input.dataset.roomConfiguration;
+        const values = Array.from(rows.querySelectorAll(`input[data-tariff-id="${tariffId}"][data-room-configuration="${configuration}"]:not([data-day="all"])`))
             .map(dayInput => Number(dayInput.value) || 0);
         const firstValue = values[0] || 0;
         input.value = values.length > 0 && values.every(value => value === firstValue) ? firstValue : 0;

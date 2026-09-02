@@ -504,8 +504,10 @@ class QuoteController extends Controller
             'pricing_type' => 'required|in:economico,vip,privado',
             'room_counts' => 'nullable|array',
             'room_counts.simple' => 'nullable|integer|min:0',
-            'room_counts.doble' => 'nullable|integer|min:0',
+            'room_counts.doble_1_cama' => 'nullable|integer|min:0',
+            'room_counts.doble_2_camas' => 'nullable|integer|min:0',
             'room_counts.triple' => 'nullable|integer|min:0',
+            'room_counts.triple_1_doble' => 'nullable|integer|min:0',
         ]);
 
         DB::transaction(function () use ($quote, $data): void {
@@ -556,10 +558,12 @@ class QuoteController extends Controller
 
             $roomCounts = collect($data['room_counts'] ?? [])
                 ->mapWithKeys(fn ($count, $roomType) => [$roomType => (int) $count])
-                ->only(['simple', 'doble', 'triple']);
+                ->only(['simple', 'doble_1_cama', 'doble_2_camas', 'triple', 'triple_1_doble']);
             $totalCapacity = ($roomCounts['simple'] ?? 0)
-                + (($roomCounts['doble'] ?? 0) * 2)
-                + (($roomCounts['triple'] ?? 0) * 3);
+                + (($roomCounts['doble_1_cama'] ?? 0) * 2)
+                + (($roomCounts['doble_2_camas'] ?? 0) * 2)
+                + (($roomCounts['triple'] ?? 0) * 3)
+                + (($roomCounts['triple_1_doble'] ?? 0) * 3);
 
             if ($roomCounts->sum() > 0 && $totalCapacity < $passengersCount) {
                 throw ValidationException::withMessages([
@@ -587,8 +591,9 @@ class QuoteController extends Controller
 
                         $patterns = match ($roomType) {
                             'simple' => ['%spl%', '%single%', '%simple%'],
-                            'doble' => ['%dbl%', '%double%', '%doble%', '%matrimonial%'],
+                            'doble_1_cama', 'doble_2_camas' => ['%dbl%', '%double%', '%doble%', '%matrimonial%'],
                             'triple' => ['%tpl%', '%triple%'],
+                            'triple_1_doble' => ['%tpl%', '%triple%'],
                         };
 
                         $tariffQuery = Tariff::where('id_service', $service->id_service)
@@ -780,12 +785,15 @@ class QuoteController extends Controller
             'single' => 'simple',
             'simple' => 'simple',
             'spl' => 'simple',
+            'doble_1_cama' => 'doble_1_cama',
+            'doble_2_camas' => 'doble_2_camas',
             'double' => 'doble',
             'doble' => 'doble',
             'dbl' => 'doble',
             'matrimonial' => 'doble',
             'queen' => 'doble',
             'king' => 'doble',
+            'triple_1_doble' => 'triple_1_doble',
             'triple' => 'triple',
             'tpl' => 'triple',
         ];
@@ -814,7 +822,10 @@ class QuoteController extends Controller
         $map = [
             'simple' => 1,
             'doble' => 2,
+            'doble_1_cama' => 2,
+            'doble_2_camas' => 2,
             'triple' => 3,
+            'triple_1_doble' => 3,
         ];
 
         return $map[$roomType] ?? 1;
@@ -1503,7 +1514,7 @@ class QuoteController extends Controller
 
         $selectedSeasonId = $this->resolveSeasonIdForQuote($service, $quote, $selectedSeasonId);
 
-        if ($serviceSeasonCount > 0 && $selectedSeasonId === null && (!$quote->start_date || !$quote->end_date)) {
+        if ($serviceSeasonCount > 0 && $selectedSeasonId === null && (! $quote->start_date || ! $quote->end_date)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Este hotel tiene tarifas por temporada. Selecciona la temporada antes de guardar.',
@@ -1513,6 +1524,7 @@ class QuoteController extends Controller
         $daySeasonCache = [];
 
         $submittedAllocations = $request->input('room_allocations', []);
+        $submittedConfigurations = $request->input('room_configurations', []);
         $allDayAllocations = collect($submittedAllocations['all'] ?? [])
             ->map(fn ($count) => (int) $count)
             ->filter(fn ($count) => $count > 0);
@@ -1521,11 +1533,24 @@ class QuoteController extends Controller
             ->map(fn ($allocations) => collect($allocations)
                 ->map(fn ($count) => (int) $count));
         $hasRoomAllocations = $allDayAllocations->isNotEmpty()
-            || $dayAllocations->contains(fn ($allocations) => $allocations->contains(fn ($count) => $count > 0));
+            || $dayAllocations->contains(fn ($allocations) => $allocations->contains(fn ($count) => $count > 0))
+            || collect($submittedConfigurations)->contains(fn ($configurations) => collect($configurations)
+                ->contains(fn ($tariffs) => collect($tariffs)->contains(fn ($count) => (int) $count > 0)));
 
         if ($hasRoomAllocations) {
+            $configurationAllocations = collect($submittedConfigurations)
+                ->map(fn ($configurations) => collect($configurations)
+                    ->flatMap(fn ($tariffs, $configuration) => collect($tariffs)
+                        ->map(fn ($count, $tariffId) => [
+                            'configuration' => $configuration,
+                            'tariff_id' => (int) $tariffId,
+                            'count' => (int) $count,
+                        ]))
+                    ->filter(fn ($allocation) => $allocation['count'] > 0)
+                    ->values());
             $tariffIds = $allDayAllocations->keys()
                 ->merge($dayAllocations->flatMap(fn ($allocations) => $allocations->keys()))
+                ->merge($configurationAllocations->flatMap(fn ($allocations) => $allocations->pluck('tariff_id')))
                 ->unique()
                 ->values();
 
@@ -1560,7 +1585,7 @@ class QuoteController extends Controller
                 if ($dayTariffs->count() !== $tariffIds->count()) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Una o más tarifas no pertenecen al hotel seleccionado para la fecha del día '. $dayNumber .'.',
+                        'message' => 'Una o más tarifas no pertenecen al hotel seleccionado para la fecha del día '.$dayNumber.'.',
                     ], 422);
                 }
 
@@ -1570,18 +1595,35 @@ class QuoteController extends Controller
                     ->where('id_service', $service->id_service)
                     ->delete();
 
-                $roomAllocations = $allDayAllocations->toArray();
-                foreach ($dayAllocations->get((string) $dayNumber, collect()) as $tariffId => $count) {
-                    $roomAllocations[$tariffId] = $count;
+                $roomAllocations = $configurationAllocations->get((string) $dayNumber, collect());
+                if ($roomAllocations->isEmpty()) {
+                    $roomAllocations = $configurationAllocations->get('all', collect());
                 }
-                $roomAllocations = collect($roomAllocations)->filter(fn ($count) => $count > 0);
+                if ($roomAllocations->isEmpty()) {
+                    $roomAllocations = $allDayAllocations
+                        ->map(fn ($count, $tariffId) => [
+                            'configuration' => null,
+                            'tariff_id' => (int) $tariffId,
+                            'count' => (int) $count,
+                        ])
+                        ->merge($dayAllocations->get((string) $dayNumber, collect())
+                            ->map(fn ($count, $tariffId) => [
+                                'configuration' => null,
+                                'tariff_id' => (int) $tariffId,
+                                'count' => (int) $count,
+                            ]))
+                        ->filter(fn ($allocation) => $allocation['count'] > 0)
+                        ->values();
+                }
 
-                foreach ($roomAllocations as $tariffId => $roomCount) {
+                foreach ($roomAllocations as $allocation) {
+                    $tariffId = $allocation['tariff_id'];
+                    $roomCount = $allocation['count'];
                     $selectedTariff = $dayTariffs->get($tariffId);
                     if (! $selectedTariff) {
                         continue;
                     }
-                    $roomType = $this->normalizeRoomType($selectedTariff->subCategory?->name);
+                    $roomType = $this->normalizeRoomType($allocation['configuration'] ?? $selectedTariff->subCategory?->name);
                     $unitPrice = (float) $selectedTariff->price;
 
                     QuoteAccommodation::create([
