@@ -50,7 +50,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             ['FECHA:', now()->format('d/m/Y'), '', ''],
             ['', '', '', ''],
             ['', '', '', ''],
-            ['FECHA', 'CIUDAD', 'SERVICIO', 'PRECIO'],
+            ['FECHA', 'CIUDAD','SERVICIO', 'PRECIO'],
         ];
     }
 
@@ -123,16 +123,16 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                     $day->name,
                     $serviceName,
                     $unitPrice,
-
+                
                 ]);
 
                 $grandSubtotal += $unitPrice;
             }
         }
 
-        $rows->push(['', '', 'Servicios, precio neto por persona no comisionable:', $grandSubtotal]);
-        $rows->push(['', '', '', $passengers]);
-        $rows->push(['', '', 'Sub Total Servicios', $grandSubtotal * $passengers]);
+        $rows->push(['','', 'Servicios, precio neto por persona no comisionable:', $grandSubtotal]);
+        $rows->push(['','', '', $passengers]);
+        $rows->push(['','', 'Sub Total Servicios', $grandSubtotal * $passengers]);
 
         $accommodationsByOption = $quote->accommodations
             ->sortBy([
@@ -172,8 +172,8 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         $hotelName = $accommodation->service?->supplier?->supplier_name ?? 'Hotel no especificado';
         $serviceName = $accommodation->service?->name_service ?? 'Servicio eliminado';
         $richText = new RichText;
-        $richText->createTextRun($hotelName)->getFont()->setBold(true)->setColor(new Color('FF1F4E78'));
-        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF7F8C8D'));
+        $richText->createTextRun($hotelName)->getFont()->setBold(true);
+        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('FF808080'));
 
         return $richText;
     }
@@ -197,17 +197,16 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
         return [
             1 => [
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '1F4E78']],
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'font' => ['bold' => true],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'D9EAF7']],
             ],
             3 => [
                 'font' => ['bold' => true, 'size' => 13],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '548235']],
-                'font' => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E2F0D9']],
             ],
             4 => [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => '70AD47']],
+                'font' => ['bold' => true],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E2F0D9']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
             'A1:F'.$sheet->getHighestRow() => [
@@ -239,12 +238,12 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                     $value = (string) $sheet->getCell('A'.$row->getRowIndex())->getValue();
                     if (str_starts_with($value, 'HOSPEDAJE - OPCIÓN')) {
                         $sheet->getStyle('A'.$row->getRowIndex().':F'.$row->getRowIndex())->applyFromArray([
-                            'font' => ['bold' => true, 'size' => 13, 'color' => ['rgb' => 'FFFFFF']],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'C55A11']],
+                            'font' => ['bold' => true, 'size' => 13],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
                         ]);
                         $sheet->getStyle('A'.($row->getRowIndex() + 1).':F'.($row->getRowIndex() + 1))->applyFromArray([
-                            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'ED7D31']],
+                            'font' => ['bold' => true],
+                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
                             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
                         ]);
                     }
