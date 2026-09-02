@@ -794,7 +794,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             }
                                             $groups[$sid]['days'][] = $hotel->quoteDay->day_number;
                                             $groups[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
-                                            $groups[$sid]['prices'][] = $hotel->unit_price;
+                                            $groups[$sid]['prices'][$hotel->quoteDay->day_number] = (float) $hotel->unit_price;
                                             $groups[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
                                             $roomType = $hotel->room_type ?? 'simple';
                                             $roomCount = (int) ($hotel->room_count ?? 1);
@@ -856,7 +856,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 </div>
                                                                 <div class="day-hotel">
                                                                     <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
-                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
+                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
                                                                 </div>
                                                                 <div class="day-actions">
                                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(1, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">
@@ -913,7 +913,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                             }
                                             $groups2[$sid]['days'][] = $hotel->quoteDay->day_number;
                                             $groups2[$sid]['dates'][$hotel->quoteDay->day_number] = $hotel->quoteDay->date?->format('d/m/Y') ?? 'Fecha no definida';
-                                            $groups2[$sid]['prices'][] = $hotel->unit_price;
+                                            $groups2[$sid]['prices'][$hotel->quoteDay->day_number] = (float) $hotel->unit_price;
                                             $groups2[$sid]['accom_ids'][$hotel->quoteDay->day_number] = $hotel->id_quote_accommodation;
                                         }
                                     @endphp
@@ -981,7 +981,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                                 </div>
                                                                 <div class="day-hotel">
                                                                     <span class="hotel-name"><strong>{{ $group['service']?->supplier?->supplier_name ?? 'Sin proveedor' }}</strong><small style="display:block; color:var(--qe-ink-500);">{{ $group['service']?->name_service ?? 'Hotel eliminado' }}</small></span>
-                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][array_search($d, $days)] ?? $group['prices'][0], 2) }}</span>
+                                                                    <span class="hotel-price">$ {{ number_format($group['prices'][$d] ?? 0, 2) }}</span>
                                                                 </div>
                                                                 <div class="day-actions">
                                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openAccommodationToDayModal(2, {{ $d }}, {{ $d }}, {{ $d }}, {{ $group['service']->id_service }})" title="Cambiar habitaciones">
@@ -2391,10 +2391,41 @@ function selectAccommodationService(serviceId, serviceName) {
     }
 }
 
-function resolveAccommodationSeasonFromQuote(serviceId) {
+function getAccommodationDayDate(dayNumber) {
+    if (!quoteStartDate || dayNumber === null || dayNumber === undefined || dayNumber === '') {
+        return null;
+    }
+
+    const start = new Date(quoteStartDate + 'T00:00:00');
+    const target = new Date(start);
+    target.setDate(start.getDate() + (Number(dayNumber) - 1));
+    return target;
+}
+
+function resolveAccommodationSeasonFromQuote(serviceId, dayNumber = null) {
     const seasons = accommodationSeasonOptions[serviceId] || {};
     const entries = Object.entries(seasons || {});
-    if (!quoteHasDates || !quoteStartDate || !quoteEndDate || entries.length === 0) {
+    if (entries.length === 0) {
+        return null;
+    }
+
+    const dayDate = getAccommodationDayDate(dayNumber);
+    if (dayDate && quoteStartDate) {
+        const matching = entries.find(([seasonId, season]) => {
+            if (!season || !season.start_date || !season.end_date) {
+                return false;
+            }
+            const seasonStart = new Date(season.start_date + 'T00:00:00');
+            const seasonEnd = new Date(season.end_date + 'T00:00:00');
+            return dayDate >= seasonStart && dayDate <= seasonEnd;
+        });
+
+        if (matching) {
+            return matching[0];
+        }
+    }
+
+    if (!quoteHasDates || !quoteStartDate || !quoteEndDate) {
         return null;
     }
 
@@ -2420,7 +2451,7 @@ function resolveAccommodationSeasonFromQuote(serviceId) {
     return null;
 }
 
-function onAccommodationServiceSelect(serviceName = null) {
+function onAccommodationServiceSelect(serviceName = null, dayNumber = null) {
     const select = document.getElementById('accommodation_service_select');
     const preview = document.getElementById('accPricePreviewText');
     const typesPanel = document.getElementById('accommodationRoomTypes');
@@ -2444,17 +2475,20 @@ function onAccommodationServiceSelect(serviceName = null) {
     const serviceId = Number(select.value);
     const seasons = accommodationSeasonOptions[serviceId] || {};
     const seasonEntries = Object.entries(seasons || {});
-    const autoDetectedSeason = resolveAccommodationSeasonFromQuote(serviceId);
-    const showManualSeason = seasonEntries.length > 0 && !autoDetectedSeason && (!quoteHasDates || seasonEntries.length > 1);
+    const autoDetectedSeason = resolveAccommodationSeasonFromQuote(serviceId, dayNumber);
+    const showManualSeason = seasonEntries.length > 0 && !autoDetectedSeason && !quoteHasDates;
     const optionKey = `${document.getElementById('acc_option_number')?.value || 1}:${serviceId}`;
     const savedSeason = existingAccommodationSeasons[optionKey] || '';
 
     if (seasonSelect) {
         seasonSelect.innerHTML = '<option value="">Seleccione la temporada</option>' + seasonEntries.map(([seasonId, season]) => `<option value="${seasonId}">${escapeHtml(season.name || 'Temporada')}</option>`).join('');
-        if (savedSeason) {
+
+        const preferredSeason = autoDetectedSeason || (quoteHasDates ? '' : savedSeason) || (!quoteHasDates && seasonEntries.length === 1 ? seasonEntries[0][0] : '');
+
+        if (preferredSeason) {
+            seasonSelect.value = String(preferredSeason);
+        } else if (savedSeason) {
             seasonSelect.value = String(savedSeason);
-        } else if (autoDetectedSeason) {
-            seasonSelect.value = String(autoDetectedSeason);
         } else if (seasonEntries.length === 1) {
             seasonSelect.value = seasonEntries[0][0];
         } else {
@@ -2626,7 +2660,7 @@ function addAccommodationToDay() {
     const seasonSelect = document.getElementById('accommodation_season_select');
     const selectedSeason = seasonSelect ? seasonSelect.value : '';
     const serviceHasSeasons = Object.keys(accommodationSeasonOptions[Number(serviceSelect.value)] || {}).length > 0;
-    if (serviceHasSeasons && !selectedSeason) {
+    if (serviceHasSeasons && !selectedSeason && !quoteHasDates) {
         Swal.fire({ icon: 'warning', title: 'Selecciona la temporada', text: 'Este hotel tiene tarifas por temporada. Elige la temporada antes de guardar.', confirmButtonColor: '#6366f1' });
         return;
     }
@@ -2823,7 +2857,7 @@ function openAccommodationToDayModal(optionNumber, dayNumber, dayStart, dayEnd, 
             if (selectedServiceNights) {
                 selectedServiceNights.textContent = `Días ${selectedStart} al ${selectedEnd}`;
             }
-            onAccommodationServiceSelect(selectedText);
+            onAccommodationServiceSelect(selectedText, selectedStart);
             prefillAccommodationRoomMatrix(optionNumber, serviceId, selectedStart, selectedEnd);
         }
     } else {

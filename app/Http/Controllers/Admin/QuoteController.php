@@ -913,6 +913,39 @@ class QuoteController extends Controller
         return null;
     }
 
+    private function resolveSeasonIdForDay(Service $service, ?\DateTimeInterface $date, ?int $selectedSeasonId = null): ?int
+    {
+        if ($selectedSeasonId !== null) {
+            return $selectedSeasonId;
+        }
+
+        if (! $date) {
+            return null;
+        }
+
+        $matchingSeason = Tariff::with('season')
+            ->where('id_service', $service->id_service)
+            ->where('status', 'active')
+            ->whereNotNull('id_season')
+            ->whereHas('season', function ($query) use ($date) {
+                $query->where('status', 'active')
+                    ->whereDate('start_date', '<=', $date->format('Y-m-d'))
+                    ->whereDate('end_date', '>=', $date->format('Y-m-d'));
+            })
+            ->select('id_season')
+            ->get()
+            ->pluck('id_season')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($matchingSeason->count() === 1) {
+            return (int) $matchingSeason->first();
+        }
+
+        return null;
+    }
+
     private function getTariffForService(Service $service, int $passengersCount, ?Quote $quote = null): ?Tariff
     {
         $query = Tariff::with('season')
@@ -1477,6 +1510,8 @@ class QuoteController extends Controller
             ], 422);
         }
 
+        $daySeasonCache = [];
+
         $submittedAllocations = $request->input('room_allocations', []);
         $allDayAllocations = collect($submittedAllocations['all'] ?? [])
             ->map(fn ($count) => (int) $count)
@@ -1493,25 +1528,6 @@ class QuoteController extends Controller
                 ->merge($dayAllocations->flatMap(fn ($allocations) => $allocations->keys()))
                 ->unique()
                 ->values();
-            $seasonTariffQuery = Tariff::with('subCategory')
-                ->where('id_service', $service->id_service)
-                ->where('status', 'active')
-                ->whereIn('id_tariff', $tariffIds);
-
-            if ($selectedSeasonId !== null) {
-                $seasonTariffQuery->where('id_season', $selectedSeasonId);
-            } else {
-                $seasonTariffQuery->whereNull('id_season');
-            }
-
-            $tariffs = $seasonTariffQuery->get()->keyBy('id_tariff');
-
-            if ($tariffs->count() !== $tariffIds->count()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Una o más tarifas no pertenecen al hotel seleccionado.',
-                ], 422);
-            }
 
             $daysAssigned = 0;
             for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
@@ -1519,6 +1535,33 @@ class QuoteController extends Controller
 
                 if (! $day) {
                     continue;
+                }
+
+                $daySeasonId = $this->resolveSeasonIdForDay($service, $day->date, $selectedSeasonId);
+                $dayTariffs = Tariff::with('subCategory')
+                    ->where('id_service', $service->id_service)
+                    ->where('status', 'active')
+                    ->whereIn('id_tariff', $tariffIds)
+                    ->when($daySeasonId !== null, fn ($query) => $query->where('id_season', $daySeasonId), fn ($query) => $query->whereNull('id_season'))
+                    ->get()
+                    ->keyBy('id_tariff');
+
+                if ($dayTariffs->count() !== $tariffIds->count()) {
+                    $fallbackQuery = Tariff::with('subCategory')
+                        ->where('id_service', $service->id_service)
+                        ->where('status', 'active')
+                        ->whereIn('id_tariff', $tariffIds)
+                        ->where(function ($query) use ($selectedSeasonId) {
+                            $query->when($selectedSeasonId !== null, fn ($seasonQuery) => $seasonQuery->where('id_season', $selectedSeasonId), fn ($seasonQuery) => $seasonQuery->whereNull('id_season'));
+                        });
+                    $dayTariffs = $fallbackQuery->get()->keyBy('id_tariff');
+                }
+
+                if ($dayTariffs->count() !== $tariffIds->count()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Una o más tarifas no pertenecen al hotel seleccionado para la fecha del día '. $dayNumber .'.',
+                    ], 422);
                 }
 
                 QuoteAccommodation::where('id_quote', $quote->id_quote)
@@ -1534,7 +1577,10 @@ class QuoteController extends Controller
                 $roomAllocations = collect($roomAllocations)->filter(fn ($count) => $count > 0);
 
                 foreach ($roomAllocations as $tariffId => $roomCount) {
-                    $selectedTariff = $tariffs->get($tariffId);
+                    $selectedTariff = $dayTariffs->get($tariffId);
+                    if (! $selectedTariff) {
+                        continue;
+                    }
                     $roomType = $this->normalizeRoomType($selectedTariff->subCategory?->name);
                     $unitPrice = (float) $selectedTariff->price;
 
@@ -1544,7 +1590,7 @@ class QuoteController extends Controller
                         'id_quote_day' => $day->id_quote_day,
                         'id_service' => $service->id_service,
                         'id_tariff' => $selectedTariff->id_tariff,
-                        'id_season' => $selectedSeasonId ?? ($selectedTariff?->id_season ?? null),
+                        'id_season' => $daySeasonId ?? ($selectedTariff?->id_season ?? null),
                         'id_supplier' => $service->id_supplier,
                         'room_type' => $roomType,
                         'room_capacity' => $this->getRoomCapacity($roomType),
@@ -1567,16 +1613,6 @@ class QuoteController extends Controller
         }
 
         if (! $request->filled('id_accommodation')) {
-            $selectedTariff = null;
-            if ($selectedSeasonId !== null) {
-                $selectedTariff = Tariff::where('id_service', $service->id_service)
-                    ->where('status', 'active')
-                    ->where('id_season', $selectedSeasonId)
-                    ->orderByRaw('CASE WHEN id_season IS NULL THEN 0 ELSE 1 END DESC')
-                    ->orderBy('price')
-                    ->first();
-            }
-
             // Register the hotel without room quantities; rooms can be defined later.
             $daysAssigned = 0;
             for ($dayNumber = $startDay; $dayNumber <= $endDay; $dayNumber++) {
@@ -1585,6 +1621,15 @@ class QuoteController extends Controller
                 if (! $day) {
                     continue;
                 }
+
+                $daySeasonId = $this->resolveSeasonIdForDay($service, $day->date, $selectedSeasonId);
+                $seasonTariffQuery = Tariff::where('id_service', $service->id_service)
+                    ->where('status', 'active')
+                    ->when($daySeasonId !== null, fn ($query) => $query->where('id_season', $daySeasonId), fn ($query) => $query->whereNull('id_season'))
+                    ->orderByRaw('CASE WHEN id_season IS NULL THEN 0 ELSE 1 END DESC')
+                    ->orderBy('price');
+
+                $selectedTariff = $seasonTariffQuery->first();
 
                 QuoteAccommodation::where('id_quote', $quote->id_quote)
                     ->where('option_number', $data['option_number'])
@@ -1598,7 +1643,7 @@ class QuoteController extends Controller
                     'id_quote_day' => $day->id_quote_day,
                     'id_service' => $service->id_service,
                     'id_tariff' => $selectedTariff?->id_tariff,
-                    'id_season' => $selectedSeasonId ?? ($selectedTariff?->id_season ?? null),
+                    'id_season' => $daySeasonId ?? ($selectedTariff?->id_season ?? null),
                     'id_supplier' => $service->id_supplier,
                     'room_type' => null,
                     'room_capacity' => 1,
