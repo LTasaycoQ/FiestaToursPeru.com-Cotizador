@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\QuoteDetailExport;
 use App\Exports\QuoteDocxExport;
-use App\Exports\QuoteExport;
+use App\Exports\QuoteTariffExport;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Contact;
@@ -329,12 +330,12 @@ class QuoteController extends Controller
 
     public function exportExcel(Quote $quote)
     {
-        return Excel::download(new QuoteExport($quote->id_quote, 'detail'), 'cotizacion-'.$quote->id_quote.'-detalle.xlsx');
+        return Excel::download(new QuoteDetailExport($quote->id_quote), 'cotizacion-'.$quote->id_quote.'-detalle.xlsx');
     }
 
     public function exportExcelTariffs(Quote $quote)
     {
-        return Excel::download(new QuoteExport($quote->id_quote, 'tariff'), 'cotizacion-'.$quote->id_quote.'-tarifas.xlsx');
+        return Excel::download(new QuoteTariffExport($quote->id_quote), 'cotizacion-'.$quote->id_quote.'-tarifas.xlsx');
     }
 
     public function exportPdf(Quote $quote)
