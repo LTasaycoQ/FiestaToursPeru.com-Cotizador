@@ -114,10 +114,30 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
                             ->getFont()->setBold(true);
                     }
 
+                    if ($firstCell === 'TARIFAS DE HOTELES') {
+                        $sheet->getStyle('A'.$rowNumber.':N'.$rowNumber)
+                            ->getFont()->setBold(true)->setSize(11);
+                    }
+
+                    if ($firstCell === 'HOTEL / SERVICIO') {
+                        $sheet->getStyle('A'.$rowNumber.':I'.$rowNumber)
+                            ->getFont()->setBold(true);
+                        $sheet->getStyle('A'.$rowNumber.':I'.$rowNumber)
+                            ->getBorders()->getAllBorders()
+                            ->setBorderStyle(Border::BORDER_THIN)
+                            ->getColor()->setRGB('000000');
+                    }
+
                     if ($sheet->getCell('A'.$rowNumber)->getValue() === 'Total servicios') {
                         $sheet->getStyle('A'.$rowNumber.':N'.$rowNumber)
                             ->getFont()->setBold(true);
                         $sheet->getStyle('B'.$rowNumber.':N'.$rowNumber)
+                            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    }
+
+                    if (is_numeric($sheet->getCell('F'.$rowNumber)->getValue())
+                        && $sheet->getCell('A'.$rowNumber)->getValue() !== 'Total servicios') {
+                        $sheet->getStyle('C'.$rowNumber.':I'.$rowNumber)
                             ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     }
                 }
@@ -129,6 +149,9 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
     {
         $quote = Quote::with([
             'quoteDays.details.service.tariffs.subCategory',
+            'accommodations.service.supplier.city',
+            'accommodations.service.tariffs.subCategory',
+            'accommodations.tariff.subCategory',
         ])->findOrFail($this->quoteId);
 
         $rows = collect();
@@ -160,6 +183,53 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
         }
 
         $rows->push(['Total servicios', ...$totals]);
+        $rows->push(array_fill(0, 14, ''));
+        $rows->push(['TARIFAS DE HOTELES', ...array_fill(0, 13, '')]);
+        $rows->push([
+            'HOTEL / SERVICIO',
+            'CIUDAD',
+            'SPL',
+            'DBL',
+            'TPL',
+            'NTS',
+            'TOTAL SPL',
+            'TOTAL DBL',
+            'TOTAL TPL',
+            ...array_fill(0, 5, ''),
+        ]);
+
+        $quote->accommodations
+            ->groupBy(fn ($accommodation) => implode(':', [
+                $accommodation->id_service,
+                $accommodation->id_season ?? $accommodation->tariff?->id_season ?? 'base',
+            ]))
+            ->each(function (Collection $accommodations) use (&$rows): void {
+                $accommodation = $accommodations->first();
+                $tariffs = $accommodation->service?->tariffs?->where('status', 'active') ?? collect();
+                $prices = ['SPL' => 0, 'DBL' => 0, 'TPL' => 0];
+
+                foreach ($tariffs as $tariff) {
+                    $roomCode = $this->hotelRoomTypeCode($tariff->subCategory?->name);
+                    if (array_key_exists($roomCode, $prices)) {
+                        $prices[$roomCode] = (float) $tariff->price;
+                    }
+                }
+
+                $nights = $accommodations->pluck('id_quote_day')->unique()->count();
+                $rows->push([
+                    ($accommodation->service?->supplier?->supplier_name ?? 'Hotel no especificado')
+                        .' - '.($accommodation->service?->name_service ?? 'Servicio eliminado'),
+                    $accommodation->service?->supplier?->city?->name ?? 'Ciudad no especificada',
+                    $prices['SPL'],
+                    $prices['DBL'],
+                    $prices['TPL'],
+                    $nights,
+                    $prices['SPL'] * $nights,
+                    $prices['DBL'] * $nights,
+                    $prices['TPL'] * $nights,
+                    ...array_fill(0, 5, ''),
+                ]);
+            });
 
         return $rows;
     }
@@ -182,6 +252,17 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
         }
 
         return [$serviceName, ...$prices];
+    }
+
+    private function hotelRoomTypeCode(?string $tariffName): string
+    {
+        $value = mb_strtolower($tariffName ?? '');
+
+        return str_contains($value, 'tpl') || str_contains($value, 'triple')
+            ? 'TPL'
+            : (str_contains($value, 'dbl') || str_contains($value, 'doble') || str_contains($value, 'double')
+                ? 'DBL'
+                : 'SPL');
     }
 
     private function privateRangeIndexes(?int $min, ?int $max): array
