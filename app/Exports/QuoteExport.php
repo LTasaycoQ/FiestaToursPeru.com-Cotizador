@@ -5,7 +5,6 @@ namespace App\Exports;
 use App\Models\Quote;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -18,7 +17,7 @@ use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHeadings, WithStyles, WithTitle
+class QuoteExport implements FromCollection, WithEvents, WithHeadings, WithStyles, WithTitle
 {
     private const PRIVATE_RANGES = ['1', '2', '3/4', '5/9', '10/14', '15/19', '20/24', '25/29', '30/up'];
 
@@ -144,7 +143,15 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             ->groupBy(fn ($accommodation) => (int) ($accommodation->option_number ?: 1));
 
         foreach ($accommodationsByOption as $optionNumber => $accommodations) {
-            $roomCodes = $this->hotelRoomCodes($accommodations);
+            $roomCodes = array_values(array_filter(
+                $this->hotelRoomCodes($accommodations),
+                fn (string $roomCode): bool => $accommodations->contains(
+                    fn ($accommodation): bool => $this->hotelRoomTypeCode(
+                        $accommodation->room_type,
+                        $accommodation->tariff?->subCategory?->name
+                    ) === $roomCode
+                )
+            ));
             $rows->push(['', '', '', '']);
             $rows->push(['FECHA', 'NTS', 'CIUDAD', 'HOTEL', '', '', '', ...$roomCodes, 'TOTAL']);
 
@@ -194,7 +201,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         $serviceName = $accommodation->service?->name_service ?? 'Servicio eliminado';
         $richText = new RichText;
         $richText->createTextRun($hotelName)->getFont()->setBold(true);
-        $richText->createTextRun("\n".$serviceName)->getFont()->setSize(9)->setColor(new Color('7191A8'));
+        $richText->createTextRun(' - '.$serviceName)->getFont()->setSize(9)->setColor(new Color('7191A8'));
 
         return $richText;
     }
@@ -322,18 +329,19 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 }
 
                 if ($this->mode !== 'tariff') {
+                    // Ajusta aquí los anchos de las columnas del Excel (aprox. 7 px por unidad).
                     $sheet->getColumnDimension('A')->setWidth(14);
-                    $sheet->getColumnDimension('B')->setWidth(18);
+                    $sheet->getColumnDimension('B')->setWidth(14); // Ciudad en servicios / NTS en hoteles.
                     $sheet->getColumnDimension('C')->setAutoSize(false);
-                    $sheet->getColumnDimension('C')->setWidth(40);
+                    $sheet->getColumnDimension('C')->setWidth(35); // Servicio: aprox. 280 px.
                     $sheet->getColumnDimension('D')->setWidth(11);
                     $sheet->getColumnDimension('E')->setWidth(11);
                     $sheet->getColumnDimension('F')->setWidth(11);
                     $sheet->getColumnDimension('G')->setWidth(11);
-                    $sheet->getColumnDimension('H')->setWidth(13);
-                    $sheet->getColumnDimension('I')->setWidth(13);
-                    $sheet->getColumnDimension('J')->setWidth(13);
-                    $sheet->getColumnDimension('K')->setWidth(14);
+                    $sheet->getColumnDimension('H')->setWidth(13); // SPL.
+                    $sheet->getColumnDimension('I')->setWidth(13); // DBL.
+                    $sheet->getColumnDimension('J')->setWidth(13); // TPL.
+                    $sheet->getColumnDimension('K')->setWidth(14); // TOTAL.
                     $sheet->getStyle('A1:K'.$sheet->getHighestRow())
                         ->getAlignment()
                         ->setVertical(Alignment::VERTICAL_CENTER);
@@ -355,24 +363,54 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                         $sheet->getRowDimension($rowNumber)->setRowHeight(22);
 
                         if ($columnB === 'NTS') {
-                            $sheet->getStyle('A'.$rowNumber.':K'.$rowNumber)
+                            $headerEnd = 'D';
+                            for ($columnIndex = 1; $columnIndex <= 11; $columnIndex++) {
+                                if ($sheet->getCellByColumnAndRow($columnIndex, $rowNumber)->getValue() === 'TOTAL') {
+                                    $headerEnd = $sheet->getCellByColumnAndRow($columnIndex, $rowNumber)->getColumn();
+                                    break;
+                                }
+                            }
+
+                            $sheet->getStyle('A'.$rowNumber.':'.$headerEnd.$rowNumber)
                                 ->getBorders()->getAllBorders()
                                 ->setBorderStyle(Border::BORDER_THIN)
                                 ->getColor()->setRGB('000000');
-                            $sheet->getStyle('A'.$rowNumber.':K'.$rowNumber)
+                            $sheet->getStyle('A'.$rowNumber.':'.$headerEnd.$rowNumber)
                                 ->getAlignment()
                                 ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                            $sheet->getStyle('H'.$rowNumber.':'.$headerEnd.$rowNumber)
+                                ->getAlignment()
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                             continue;
                         }
 
                         if (is_numeric($columnB)) {
                             $sheet->mergeCells('D'.$rowNumber.':G'.$rowNumber);
+                            $sheet->getRowDimension($rowNumber)->setRowHeight(-1);
+                            $sheet->getStyle('D'.$rowNumber.':G'.$rowNumber)
+                                ->getAlignment()
+                                ->setWrapText(true)
+                                ->setVertical(Alignment::VERTICAL_CENTER);
                             $sheet->getStyle('H'.$rowNumber.':K'.$rowNumber)
-                                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                                ->getAlignment()
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                                ->setVertical(Alignment::VERTICAL_CENTER);
                         } elseif ($columnC) {
                             $sheet->getStyle('D'.$rowNumber)
-                                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                                ->getAlignment()
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                                ->setVertical(Alignment::VERTICAL_CENTER);
+                        }
+
+                        if ($sheet->getCell('A'.$rowNumber)->getValue() === ''
+                            && $sheet->getCell('B'.$rowNumber)->getValue() === ''
+                            && $sheet->getCell('C'.$rowNumber)->getValue() === ''
+                            && is_numeric($sheet->getCell('D'.$rowNumber)->getValue())) {
+                            $sheet->getStyle('D'.$rowNumber)
+                                ->getAlignment()
+                                ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                                ->setVertical(Alignment::VERTICAL_CENTER);
                         }
 
                         $serviceSummary = (string) $sheet->getCell('C'.$rowNumber)->getValue();
