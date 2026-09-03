@@ -13,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -48,7 +49,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
 
             // ['Para:', $quote->client->name_client ?? 'No Definido', '', ''],
             // ['REF:', $quote->name ?? 'No Definido', '', ''],
-            ['FECHA:', now()->format('d/m/Y'), '', ''],
+            ['FECHA:', $this->formatExportDate(now()), '', ''],
             ['', '', '', ''],
             ['', '', '', ''],
             ['FECHA', 'CIUDAD', 'SERVICIO', 'PRECIO'],
@@ -61,7 +62,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             'quoteDays.details.service.tariffs.subCategory',
             'quoteDays.details.tariff.subCategory',
             'accommodations.quoteDay',
-            'accommodations.service.supplier',
+            'accommodations.service.supplier.city',
             'accommodations.tariff.subCategory',
         ])->findOrFail($this->quoteId);
 
@@ -119,7 +120,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 $unitPrice = (float) ($detail->unit_price ?? 0);
 
                 $rows->push([
-                    'Día '.$day->day_number,
+                    $this->formatExportDate($day->date, $day->day_number),
                     $day->name,
                     $serviceName,
                     $unitPrice,
@@ -143,37 +144,45 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             ->groupBy(fn ($accommodation) => (int) ($accommodation->option_number ?: 1));
 
         foreach ($accommodationsByOption as $optionNumber => $accommodations) {
+            $roomCodes = $this->hotelRoomCodes($accommodations);
             $rows->push(['', '', '', '']);
-            $rows->push(['NTS', 'HOTEL', 'SPL', 'DBL', 'TPL', 'TOTAL']);
+            $rows->push(['FECHA', 'NTS', 'CIUDAD', 'HOTEL', '', '', '', ...$roomCodes, 'TOTAL']);
 
             $optionSubtotal = 0;
             $accommodations->groupBy(fn ($accommodation) => implode(':', [
                 $accommodation->id_service,
                 $accommodation->id_season ?? $accommodation->tariff?->id_season ?? 'base',
-            ]))->each(function (Collection $hotelRows) use (&$rows, &$optionSubtotal): void {
+            ]))->each(function (Collection $hotelRows) use (&$rows, &$optionSubtotal, $roomCodes): void {
                 $accommodation = $hotelRows->first();
-                $subtotal = (float) $hotelRows->sum(fn ($row) => (int) ($row->room_count ?? 0) * (float) ($row->unit_price ?? 0));
-                $optionSubtotal += $subtotal;
-                $prices = $hotelRows
+                $amounts = $hotelRows
                     ->groupBy(fn ($row) => $this->hotelRoomTypeCode($row->room_type, $row->tariff?->subCategory?->name))
-                    ->map(fn (Collection $rooms) => $rooms
-                        ->pluck('unit_price')
-                        ->filter(fn ($price) => $price !== null)
-                        ->map(fn ($price) => number_format((float) $price, 2, '.', ''))
-                        ->unique()
-                        ->implode(' / '));
+                    ->map(fn (Collection $rooms, string $roomCode): float => (float) $rooms->sum(
+                        fn ($room) => (int) ($room->room_count ?? 0)
+                            * $this->hotelRoomCapacity($roomCode)
+                            * (float) ($room->unit_price ?? 0)
+                    ));
+                $subtotal = (float) $amounts->sum();
+                $optionSubtotal += $subtotal;
 
                 $rows->push([
+                    $this->formatExportDate($hotelRows->first()->quoteDay?->date),
                     $hotelRows->pluck('id_quote_day')->unique()->count(),
+                    $accommodation->service?->supplier?->city?->name ?? 'Ciudad no especificada',
                     $this->hotelCell($accommodation),
-                    $prices->get('SPL', ''),
-                    $prices->get('DBL', ''),
-                    $prices->get('TPL', ''),
+                    '',
+                    '',
+                    '',
+                    ...collect($roomCodes)->map(fn (string $roomCode) => $amounts->get($roomCode, 0))->all(),
                     $subtotal,
                 ]);
             });
 
-            $rows->push(['', '', '', '', 'TOTAL OPCIÓN '.$optionNumber, $optionSubtotal]);
+            $rows->push([
+                '', '', '', '', '', '', '',
+                ...array_fill(0, count($roomCodes), ''),
+                'TOTAL OPCIÓN '.$optionNumber,
+                $optionSubtotal,
+            ]);
         }
 
         return $rows;
@@ -201,6 +210,45 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 : 'SPL');
     }
 
+    private function hotelRoomCapacity(string $roomCode): int
+    {
+        return match ($roomCode) {
+            'DBL' => 2,
+            'TPL' => 3,
+            default => 1,
+        };
+    }
+
+    private function hotelRoomCodes(Collection $accommodations): array
+    {
+        $codes = $accommodations
+            ->map(fn ($accommodation) => $this->hotelRoomTypeCode(
+                $accommodation->room_type,
+                $accommodation->tariff?->subCategory?->name
+            ))
+            ->filter(fn (string $code) => in_array($code, ['SPL', 'DBL', 'TPL'], true))
+            ->unique()
+            ->values()
+            ->all();
+
+        return array_values(array_intersect(['SPL', 'DBL', 'TPL'], $codes));
+    }
+
+    private function formatExportDate(mixed $date, ?int $dayNumber = null): string
+    {
+        if (! $date) {
+            return $dayNumber ? 'Día '.$dayNumber : 'Día 1';
+        }
+
+        $months = [
+            1 => 'enero', 2 => 'febrero', 3 => 'marzo', 4 => 'abril',
+            5 => 'mayo', 6 => 'junio', 7 => 'julio', 8 => 'agosto',
+            9 => 'septiembre', 10 => 'octubre', 11 => 'noviembre', 12 => 'diciembre',
+        ];
+
+        return $date->format('d').'-'.$months[(int) $date->format('n')];
+    }
+
     public function styles(Worksheet $sheet): array
     {
 
@@ -215,7 +263,6 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
             ],
             4 => [
                 'font' => ['bold' => true],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'E2F0D9']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
             ],
             'A1:F'.$sheet->getHighestRow() => [
@@ -244,28 +291,112 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
                 }
 
                 foreach ($sheet->getRowIterator() as $row) {
-                    $value = (string) $sheet->getCell('A'.$row->getRowIndex())->getValue();
-                    if (str_starts_with($value, 'HOSPEDAJE - OPCIÓN')) {
-                        $sheet->getStyle('A'.$row->getRowIndex().':F'.$row->getRowIndex())->applyFromArray([
-                            'font' => ['bold' => true, 'size' => 13],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
-                        ]);
-                        $sheet->getStyle('A'.($row->getRowIndex() + 1).':F'.($row->getRowIndex() + 1))->applyFromArray([
+                    $rowNumber = $row->getRowIndex();
+                    $value = (string) $sheet->getCell('A'.$rowNumber)->getValue();
+                    $columnB = $sheet->getCell('B'.$rowNumber)->getValue();
+                    if ($value === 'FECHA') {
+                        $headerEnd = 'D';
+                        for ($columnIndex = 1; $columnIndex <= 11; $columnIndex++) {
+                            if ($sheet->getCellByColumnAndRow($columnIndex, $rowNumber)->getValue() === 'TOTAL') {
+                                $headerEnd = $sheet->getCellByColumnAndRow($columnIndex, $rowNumber)->getColumn();
+                                break;
+                            }
+                        }
+
+                        $sheet->getStyle('A'.$rowNumber.':'.$headerEnd.$rowNumber)->applyFromArray([
                             'font' => ['bold' => true],
-                            'fill' => ['fillType' => Fill::FILL_SOLID, 'color' => ['rgb' => 'FCE4D6']],
-                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                            'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
                         ]);
+                        $sheet->getStyle('A'.$rowNumber.':'.$headerEnd.$rowNumber)
+                            ->getBorders()->getAllBorders()
+                            ->setBorderStyle(Border::BORDER_THIN)
+                            ->getColor()->setRGB('000000');
+                        $priceStart = $columnB === 'NTS' ? 'H' : 'D';
+                        $sheet->getStyle($priceStart.$rowNumber.':'.$headerEnd.$rowNumber)
+                            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+                        if ($columnB === 'NTS') {
+                            $sheet->mergeCells('D'.$rowNumber.':G'.$rowNumber);
+                        }
                     }
                 }
 
                 if ($this->mode !== 'tariff') {
-                    $sheet->getColumnDimension('A')->setWidth(10);
-                    $sheet->getColumnDimension('B')->setWidth(30);
-                    $sheet->getColumnDimension('C')->setWidth(14);
-                    $sheet->getColumnDimension('D')->setWidth(14);
-                    $sheet->getColumnDimension('E')->setWidth(14);
-                    $sheet->getColumnDimension('F')->setWidth(16);
-                    $sheet->getStyle('B1:B'.$sheet->getHighestRow())->getAlignment()->setWrapText(true);
+                    $sheet->getColumnDimension('A')->setWidth(14);
+                    $sheet->getColumnDimension('B')->setWidth(18);
+                    $sheet->getColumnDimension('C')->setAutoSize(false);
+                    $sheet->getColumnDimension('C')->setWidth(40);
+                    $sheet->getColumnDimension('D')->setWidth(11);
+                    $sheet->getColumnDimension('E')->setWidth(11);
+                    $sheet->getColumnDimension('F')->setWidth(11);
+                    $sheet->getColumnDimension('G')->setWidth(11);
+                    $sheet->getColumnDimension('H')->setWidth(13);
+                    $sheet->getColumnDimension('I')->setWidth(13);
+                    $sheet->getColumnDimension('J')->setWidth(13);
+                    $sheet->getColumnDimension('K')->setWidth(14);
+                    $sheet->getStyle('A1:K'.$sheet->getHighestRow())
+                        ->getAlignment()
+                        ->setVertical(Alignment::VERTICAL_CENTER);
+                    $sheet->getStyle('A1:K'.$sheet->getHighestRow())
+                        ->getAlignment()
+                        ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+                    $sheet->getStyle('C1:G'.$sheet->getHighestRow())
+                        ->getFont()->setSize(10);
+                    $sheet->getStyle('C1:G'.$sheet->getHighestRow())
+                        ->getAlignment()
+                        ->setWrapText(true)
+                        ->setVertical(Alignment::VERTICAL_CENTER);
+
+                    foreach ($sheet->getRowIterator() as $row) {
+                        $rowNumber = $row->getRowIndex();
+                        $columnB = $sheet->getCell('B'.$rowNumber)->getValue();
+                        $columnC = $sheet->getCell('C'.$rowNumber)->getValue();
+
+                        $sheet->getRowDimension($rowNumber)->setRowHeight(22);
+
+                        if ($columnB === 'NTS') {
+                            $sheet->getStyle('A'.$rowNumber.':K'.$rowNumber)
+                                ->getBorders()->getAllBorders()
+                                ->setBorderStyle(Border::BORDER_THIN)
+                                ->getColor()->setRGB('000000');
+                            $sheet->getStyle('A'.$rowNumber.':K'.$rowNumber)
+                                ->getAlignment()
+                                ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+                            continue;
+                        }
+
+                        if (is_numeric($columnB)) {
+                            $sheet->mergeCells('D'.$rowNumber.':G'.$rowNumber);
+                            $sheet->getStyle('H'.$rowNumber.':K'.$rowNumber)
+                                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        } elseif ($columnC) {
+                            $sheet->getStyle('D'.$rowNumber)
+                                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        }
+
+                        $serviceSummary = (string) $sheet->getCell('C'.$rowNumber)->getValue();
+                        if (in_array($serviceSummary, [
+                            'Servicios, precio neto por persona no comisionable:',
+                            'Sub Total Servicios',
+                        ], true)) {
+                            $sheet->getStyle('C'.$rowNumber.':D'.$rowNumber)
+                                ->getFont()->setBold(true);
+                        }
+
+                        if ($sheet->getCell('A'.$rowNumber)->getValue() === ''
+                            && $sheet->getCell('B'.$rowNumber)->getValue() === ''
+                            && $sheet->getCell('C'.$rowNumber)->getValue() === ''
+                            && is_numeric($sheet->getCell('D'.$rowNumber)->getValue())) {
+                            $sheet->getStyle('D'.$rowNumber)
+                                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        }
+
+                        if ($sheet->getCell('A'.$rowNumber)->getValue() !== ''
+                            && $sheet->getCell('A'.$rowNumber)->getValue() !== 'FECHA') {
+                            $sheet->getStyle('A'.$rowNumber)->getFont()->setBold(true);
+                        }
+                    }
                 }
             },
         ];
@@ -301,7 +432,7 @@ class QuoteExport implements FromCollection, ShouldAutoSize, WithEvents, WithHea
         }
 
         return [
-            'Servicio',
+            $date,
             'Día '.$dayNumber,
             $serviceName,
             ...$prices,
