@@ -48,7 +48,7 @@ class QuoteDocxExport
         $days = $quote->quoteDays()->orderBy('day_number')->with('details.service.descriptions.language')->get();
 
         foreach ($days as $day) {
-            $section->addText('Día '.$day->day_number.($day->date ? ' - '.$day->date->format('d/m/Y') : ''), ['bold' => true, 'size' => 16]);
+            $section->addText('Día '.$day->day_number.', '.($day->date ? $day->date->format('d/m/Y') : ''), ['bold' => true, 'size' => 14]);
 
             $details = $day->details()->orderBy('id_detail_quote')->get();
 
