@@ -7,10 +7,14 @@ use App\Models\Service;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use PhpOffice\PhpWord\Style\Language;
 
 class QuoteDocxExport
 {
-    public function __construct(private readonly int $quoteId) {}
+    public function __construct(
+        private readonly int $quoteId,
+        private readonly string $dayTitleColor = '275317',
+    ) {}
 
     public function download()
     {
@@ -21,20 +25,21 @@ class QuoteDocxExport
             'quoteDays.details.service.descriptions.language',
         ])->findOrFail($this->quoteId);
 
-        $phpWord = new PhpWord();
+        $phpWord = new PhpWord;
+        $phpWord->getSettings()->setThemeFontLang(new Language(Language::ES_ES));
         $section = $phpWord->addSection([
-            'marginLeft' => 600,
-            'marginRight' => 600,
+            'marginLeft' => 1580,
+            'marginRight' => 1580,
             'marginTop' => 600,
             'marginBottom' => 600,
         ]);
 
         $section->addTitle('Cotización '.($quote->quote_number ?? $quote->id_quote), 1);
-        $section->addText('Cliente: '.($quote->client?->name_client ?? 'N/A'));
-        $section->addText('Contacto: '.($quote->contact ? trim(($quote->contact->name ?? '').' '.($quote->contact->last_names ?? '')) : 'N/A'));
+        $section->addText('Cliente: '.($quote->client?->name_client ?? 'No hay pe causa'));
+        $section->addText('Contacto: '.($quote->contact ? trim(($quote->contact->name ?? '').' '.($quote->contact->last_names ?? '')) : 'No hay pe causa'));
 
         if ($quote->start_date || $quote->end_date) {
-            $section->addText('Fechas: '.($quote->start_date ? $quote->start_date->format('d/m/Y') : 'Sin definir').' - '.($quote->end_date ? $quote->end_date->format('d/m/Y') : 'Sin definir'));
+            $section->addText('Fechas: '.$this->formatShortDate($quote->start_date).' - '.$this->formatShortDate($quote->end_date));
         }
 
         if (! empty($quote->notes)) {
@@ -48,12 +53,21 @@ class QuoteDocxExport
         $days = $quote->quoteDays()->orderBy('day_number')->with('details.service.descriptions.language')->get();
 
         foreach ($days as $day) {
-            $section->addText('Día '.$day->day_number.', '.($day->date ? $day->date->format('d/m/Y') : ''), ['bold' => true, 'size' => 14]);
+            $section->addText(
+                'Día '.$day->day_number.', '.$this->formatShortDate($day->date),
+                [
+                    'bold' => true,
+                    'size' => 11,
+                    'color' => $this->dayTitleColor,
+                    'indentLeft' => 0,
+                ]
+            );
 
             $details = $day->details()->orderBy('id_detail_quote')->get();
 
             if ($details->isEmpty()) {
                 $section->addText('');
+
                 continue;
             }
 
@@ -65,52 +79,58 @@ class QuoteDocxExport
                 $table = $section->addTable([
                     'borderSize' => 6,
                     'borderColor' => 'FFFFFF',
-                    'cellMargin' => 80,
+                    'cellMargin' => 0,
                     'width' => 120,
                     'unit' => 'pct',
+                    'alignment' => 'left',
                 ]);
+                
                 $table->addRow();
 
-                $leftCell = $table->addCell(7000);
-                $leftCell->addText($serviceName, ['bold' => true, 'size' => 12]);
+                $serviceCell = $table->addCell(10000);
+                $serviceCell->addText($serviceName, ['bold' => true, 'size' => 10, 'color' => $this->dayTitleColor]);
 
                 if (trim((string) $description) !== '') {
-                    $leftCell->addTextBreak();
-                    $leftCell->addText($description);
+                    $serviceCell->addText($description);
                 }
 
                 if ($notes !== '') {
-                    $leftCell->addTextBreak();
-                    $leftCell->addText($notes, ['bold' => true, 'color' => 'C90202', 'size' => 9]);
+                    $serviceCell->addText($notes, ['bold' => true, 'color' => 'C90202', 'size' => 9]);
                 }
 
-                $rightCell = $table->addCell(3000);
                 $principalImage = $detail->service?->principalImage()->first();
                 $imagePath = $principalImage?->image_path ?? ($detail->service?->imagen ? $detail->service->imagen : null);
 
                 if ($imagePath) {
                     $absoluteImagePath = Storage::disk('public')->path($imagePath);
                     if (file_exists($absoluteImagePath)) {
-                        $rightCell->addImage($absoluteImagePath, [
-                            'width' => 140,
-                            'height' => 95,
+                        $serviceCell->addTextBreak();
+                        $serviceCell->addImage($absoluteImagePath, [
+                            'width' => 420,
+                            'height' => 90,
                             'wrappingStyle' => 'square',
                             'position' => 'relative',
+                            'alignment' => 'center',
                         ]);
                     }
                 }
 
                 $section->addTextBreak(0.5);
+
             }
 
             $section->addTextBreak();
+
         }
+
 
         $tempPath = Storage::disk('local')->path('temp/quote-'.$this->quoteId.'.docx');
         $directory = dirname($tempPath);
         if (! is_dir($directory)) {
             mkdir($directory, 0777, true);
         }
+
+        
 
         $writer = IOFactory::createWriter($phpWord, 'Word2007');
         $writer->save($tempPath);
@@ -139,5 +159,20 @@ class QuoteDocxExport
         $description = $service->descriptions()->first()?->description;
 
         return trim((string) ($description ?? ''));
+    }
+
+    private function formatShortDate(mixed $date): string
+    {
+        if (! $date) {
+            return 'Sin definir';
+        }
+
+        $months = [
+            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+            5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+            9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre',
+        ];
+
+        return $months[(int) $date->format('n')].' '.$date->format('j');
     }
 }
