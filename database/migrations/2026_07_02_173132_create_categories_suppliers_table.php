@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('categories_suppliers', function (Blueprint $table) {
             $table->id('id_categories_suppliers');
-            $table->string('category_name', 100); // Ej: Alojamiento, Operador de Tours, Transporte
+            $table->string('category_name', 100);
             $table->timestamps();
             $table->softDeletes();
         });

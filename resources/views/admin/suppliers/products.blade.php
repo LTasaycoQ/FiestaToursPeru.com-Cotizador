@@ -2387,15 +2387,9 @@
                 </div>
             </div>
 
-            {{-- PRICING TYPE (oculto, se llena desde la categoría) --}}
             <input type="hidden" name="pricing_type" id="servicePricingType" value="">
 
-            <div class="form-group">
-                <label>Descripciones por idioma</label>
-                @foreach($languages ?? [] as $language)
-                    <textarea name="descriptions[{{ $language->id_language }}]" rows="2" style="margin-top:8px;" placeholder="{{ $language->name }}"></textarea>
-                @endforeach
-            </div>
+     
 
             <div class="form-actions">
                 <button type="submit" class="btn-submit" id="submitServiceBtn">

@@ -11,12 +11,12 @@
 
 .badge-status { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; text-transform: capitalize; min-width: 90px; justify-content: center; }
 .badge-status .badge-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.badge-status.draft { background: #f1f5f9; color: #475569; } .badge-status.draft .badge-dot { background: #94a3b8; }
-.badge-status.sent { background: #dbeafe; color: #1e40af; } .badge-status.sent .badge-dot { background: #3b82f6; }
-.badge-status.approved { background: #dcfce7; color: #166534; } .badge-status.approved .badge-dot { background: #22c55e; }
-.badge-status.rejected { background: #fee2e2; color: #991b1b; } .badge-status.rejected .badge-dot { background: #ef4444; }
-.badge-status.expired { background: #fef3c7; color: #92400e; } .badge-status.expired .badge-dot { background: #f59e0b; }
-.badge-status.cancelled { background: #f1f5f9; color: #64748b; } .badge-status.cancelled .badge-dot { background: #94a3b8; }
+.badge-status.Recibido { background: #dbeafe; color: #1e40af; } .badge-status.Recibido .badge-dot { background: #3b82f6; }
+.badge-status.Enviado { background: #fef3c7; color: #92400e; } .badge-status.Enviado .badge-dot { background: #f59e0b; }
+.badge-status.Confirmado { background: #dcfce7; color: #166534; } .badge-status.Confirmado .badge-dot { background: #22c55e; }
+.badge-status.Reconfirmado { background: #ede9fe; color: #6d28d9; } .badge-status.Reconfirmado .badge-dot { background: #8b5cf6; }
+.badge-status.Cancelado { background: #fee2e2; color: #991b1b; } .badge-status.Cancelado .badge-dot { background: #ef4444; }
+.badge-status.Borrador { background: #f1f5f9; color: #475569; } .badge-status.Borrador .badge-dot { background: #94a3b8; }
 
 .btn { padding:10px; border-radius: 50px; font-weight: 500; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: none; font-size: 15px; }
 .btn-secondary { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }

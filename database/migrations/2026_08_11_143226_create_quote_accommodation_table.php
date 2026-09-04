@@ -16,6 +16,7 @@ return new class extends Migration
             $table->id('id_quote_accommodation');
 
             $table->foreignId('id_quote')->constrained('quote', 'id_quote')->cascadeOnDelete();
+            $table->foreignId('id_season')->nullable()->constrained('season', 'id_season')->nullOnDelete();
 
             $table->unsignedTinyInteger('option_number')
                 ->comment('1 = opción A de hotel, 2 = opción B de hotel');
@@ -27,7 +28,7 @@ return new class extends Migration
                 ->comment('Debe ser un service cuya categoría tenga is_accommodation = true');
             $table->foreignId('id_tariff')->nullable()->constrained('tariff', 'id_tariff');
             $table->foreignId('id_supplier')->constrained('suppliers', 'id_supplier');
-
+            $table->text('notes')->nullable()->nullable()->comment('Notas internas sobre el hotel, no se envía al cliente');
             $table->string('room_type', 32)->nullable()->comment('simple, doble, triple');
             $table->unsignedTinyInteger('room_capacity')->default(1)->comment('Capacidad de personas por habitación');
             $table->unsignedTinyInteger('room_count')->default(1)->comment('Cantidad de habitaciones del mismo tipo');

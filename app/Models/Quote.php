@@ -351,7 +351,7 @@ class Quote extends Model
 
     public function assignCorrelative(): bool
     {
-        if ($this->status !== 'approved' || $this->correlative) {
+        if ($this->status !== 'Confirmado' || $this->correlative) {
             return false;
         }
 
@@ -405,24 +405,24 @@ class Quote extends Model
     public function getStatusLabelAttribute(): string
     {
         return [
-            'draft' => 'Borrador',
-            'sent' => 'Enviada',
-            'approved' => 'Aprobada',
-            'rejected' => 'Rechazada',
-            'expired' => 'Vencida',
-            'cancelled' => 'Cancelada',
+            'Recibido' => 'Recibido',
+            'Enviado' => 'Enviado',
+            'Confirmado' => 'Confirmado',
+            'Reconfirmado' => 'Reconfirmado',
+            'Cancelado' => 'Cancelado',
+            'Borrador' => 'Borrador',
         ][$this->status] ?? $this->status;
     }
 
     public function getStatusColorAttribute(): string
     {
         return [
-            'draft' => 'gray',
-            'sent' => 'blue',
-            'approved' => 'green',
-            'rejected' => 'red',
-            'expired' => 'orange',
-            'cancelled' => 'gray',
+            'Recibido' => 'blue',
+            'Enviado' => 'orange',
+            'Confirmado' => 'green',
+            'Reconfirmado' => 'purple',
+            'Cancelado' => 'red',
+            'Borrador' => 'gray',
         ][$this->status] ?? 'gray';
     }
 

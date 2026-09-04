@@ -79,8 +79,7 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
                     ->setVertical(Alignment::VERTICAL_CENTER);
                 $sheet->getStyle('B3:N'.$lastRow)
                     ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                // Ajusta aquí el ancho de cada columna del tarifario.
-                $sheet->getColumnDimension('A')->setWidth(58); // Nombre del servicio / día.
+                $sheet->getColumnDimension('A')->setWidth(58);
                 $tariffColumnWidths = [
                     'B' => 6, // Regular Económico - Min 1.
                     'C' => 6, // Regular Económico - Min 2.
@@ -99,6 +98,14 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
                 foreach ($tariffColumnWidths as $column => $width) {
                     $sheet->getColumnDimension($column)->setWidth($width);
                 }
+                $sheet->getColumnDimension('B')->setWidth(18);
+                $sheet->getColumnDimension('C')->setWidth(10);
+                $sheet->getColumnDimension('D')->setWidth(10);
+                $sheet->getColumnDimension('E')->setWidth(10);
+                $sheet->getColumnDimension('F')->setWidth(9);
+                $sheet->getColumnDimension('G')->setWidth(12);
+                $sheet->getColumnDimension('H')->setWidth(12);
+                $sheet->getColumnDimension('I')->setWidth(12);
                 $sheet->getStyle('A1:N'.$sheet->getHighestRow())
                     ->getAlignment()->setWrapText(true);
 
@@ -126,6 +133,17 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
                             ->getBorders()->getAllBorders()
                             ->setBorderStyle(Border::BORDER_THIN)
                             ->getColor()->setRGB('000000');
+                    }
+
+                    if ($rowNumber > 1
+                        && $sheet->getCell('A'.($rowNumber - 1))->getValue() === 'HOTEL / SERVICIO'
+                    ) {
+                        $sheet->getStyle('A'.$rowNumber.':I'.$rowNumber)
+                            ->getBorders()->getAllBorders()
+                            ->setBorderStyle(Border::BORDER_THIN)
+                            ->getColor()->setRGB('D9E2F3');
+                        $sheet->getStyle('C'.$rowNumber.':I'.$rowNumber)
+                            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     }
 
                     if ($sheet->getCell('A'.$rowNumber)->getValue() === 'Total servicios') {
@@ -182,6 +200,7 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
             }
         }
 
+        $rows->push(['Cargo por Servicios', ...array_fill(0, 13, '10')]);
         $rows->push(['Total servicios', ...$totals]);
         $rows->push(array_fill(0, 14, ''));
         $rows->push(['TARIFAS DE HOTELES', ...array_fill(0, 13, '')]);
@@ -205,12 +224,19 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
             ]))
             ->each(function (Collection $accommodations) use (&$rows): void {
                 $accommodation = $accommodations->first();
-                $tariffs = $accommodation->service?->tariffs?->where('status', 'active') ?? collect();
+                $seasonId = $accommodation->id_season ?? $accommodation->tariff?->id_season;
+                $serviceTariffs = $accommodation->service?->tariffs?->where('status', 'active') ?? collect();
+                $seasonTariffs = $serviceTariffs->filter(
+                    fn ($tariff) => (string) $tariff->id_season === (string) $seasonId
+                );
+                $tariffs = $seasonId && $seasonTariffs->isNotEmpty()
+                    ? $seasonTariffs
+                    : $serviceTariffs->filter(fn ($tariff) => $tariff->id_season === null);
                 $prices = ['SPL' => 0, 'DBL' => 0, 'TPL' => 0];
 
                 foreach ($tariffs as $tariff) {
                     $roomCode = $this->hotelRoomTypeCode($tariff->subCategory?->name);
-                    if (array_key_exists($roomCode, $prices)) {
+                    if ($roomCode !== null) {
                         $prices[$roomCode] = (float) $tariff->price;
                     }
                 }
@@ -254,15 +280,17 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
         return [$serviceName, ...$prices];
     }
 
-    private function hotelRoomTypeCode(?string $tariffName): string
+    private function hotelRoomTypeCode(?string $tariffName): ?string
     {
-        $value = mb_strtolower($tariffName ?? '');
+        $value = mb_strtolower(trim($tariffName ?? ''));
 
         return str_contains($value, 'tpl') || str_contains($value, 'triple')
             ? 'TPL'
             : (str_contains($value, 'dbl') || str_contains($value, 'doble') || str_contains($value, 'double')
                 ? 'DBL'
-                : 'SPL');
+                : (str_contains($value, 'spl') || str_contains($value, 'simple') || str_contains($value, 'single')
+                    ? 'SPL'
+                    : null));
     }
 
     private function privateRangeIndexes(?int $min, ?int $max): array

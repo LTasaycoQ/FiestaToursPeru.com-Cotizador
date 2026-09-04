@@ -74,6 +74,18 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Contacto</label>
+                        <div style="display:flex; gap:8px; align-items:flex-end;">
+                            <select class="form-control" name="id_contacts" id="id_contacts" style="flex:1;">
+                                <option value="">Primero seleccione un cliente</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary" style="padding:10px 12px; white-space:nowrap; background: #0F172A;color:white; border-color: #0F172A;" onclick="openQuoteContactModal()">
+                                <i class="ti ti-plus"></i> 
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label>Tipo de mercado <span style="color:#991b1b">*</span></label>
                         <select class="form-control" name="id_labels" required>
                             <option value="">Seleccione un mercado</option>
@@ -99,17 +111,7 @@
                         <div class="hint"><i class="ti ti-language"></i> Las descripciones del documento se generarán en este idioma.</div>
                     </div>
 
-                    <div class="form-group">
-                        <label>Contacto</label>
-                        <div style="display:flex; gap:8px; align-items:flex-end;">
-                            <select class="form-control" name="id_contacts" id="id_contacts" style="flex:1;">
-                                <option value="">Primero seleccione un cliente</option>
-                            </select>
-                            <button type="button" class="btn btn-secondary" style="padding:10px 12px; white-space:nowrap; background: #0F172A;color:white; border-color: #0F172A;" onclick="openQuoteContactModal()">
-                                <i class="ti ti-plus"></i> 
-                            </button>
-                        </div>
-                    </div>
+                    
 
                     <!-- Selector de modo: Fechas exactas vs. Cantidad de días -->
                     <div class="qc-toggle">

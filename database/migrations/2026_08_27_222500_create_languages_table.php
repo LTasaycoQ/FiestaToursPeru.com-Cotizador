@@ -18,12 +18,6 @@ return new class extends Migration
             $table->string('status', 20)->default('active');
             $table->timestamps();
         });
-
-        DB::table('languages')->insert([
-            ['name' => 'Español', 'code' => 'es', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Inglés', 'code' => 'en', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Portugués', 'code' => 'pt', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
-        ]);
     }
 
     public function down(): void

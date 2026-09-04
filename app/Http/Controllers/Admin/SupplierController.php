@@ -205,7 +205,6 @@ class SupplierController extends Controller
             'chains' => 'nullable|array',
             'chains.*' => 'exists:chain,id_chain',
             'address' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
             'bank_accounts' => 'nullable|array',
             'bank_accounts.*.id_bank' => 'nullable|exists:bank,id_bank',
             'bank_accounts.*.account_number' => 'nullable|string|max:100',
@@ -238,7 +237,6 @@ class SupplierController extends Controller
                 'general_email' => $request->general_email,
                 'id_cities' => $request->id_cities,
                 'address' => $request->address,
-                'description' => $request->description,
                 'id_categories_suppliers' => $categoryId ?: null,
             ]);
 
@@ -406,7 +404,6 @@ class SupplierController extends Controller
                 'general_email' => $request->general_email,
                 'id_cities' => $request->id_cities,
                 'address' => $request->address,
-                'description' => $request->description,
                 'id_categories_suppliers' => $categoryId ?: null,
             ]);
 

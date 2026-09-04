@@ -11,8 +11,8 @@ class ClientSeeder extends Seeder
     public function run(): void
     {
         $clients = [
-            ['name_client' => 'Casa del Sol Machu Picchu', 'business_name' => 'OPERADOR TURISTICO LOS ANDES S.A.C. - OTAND SAC', 'tax_code' => '123456789', 'type_client' => 'cliente', 'general_phone' => '123456789', 'general_email' => 'info@casadelsol.com'],
-            ['name_client' => 'RUNCU AREQUIPA', 'business_name' => 'HOSTAL VALLECITO INN E.I.R.LTDA.', 'tax_code' => '1234565466789', 'type_client' => 'cliente', 'general_phone' => '12344356789', 'general_email' => 'info@runcu.com'],
+            ['name_client' => 'Ventura Viagens', 'business_name' => 'VENTURAS & AVENTURAS VIAGENS E TURISMO LTDA', 'tax_code' => '84317439113', 'type_client' => 'cliente', 'general_phone' => '473164817', 'general_email' => 'info@venturasviagens'],
+            ['name_client' => 'Marco Tours', 'business_name' => 'MARCO TOURS E.I.R.LTDA.', 'tax_code' => '84317439113', 'type_client' => 'cliente', 'general_phone' => '473164817', 'general_email' => 'info@venturasviagens'],
         ];
 
         foreach ($clients as $client) {

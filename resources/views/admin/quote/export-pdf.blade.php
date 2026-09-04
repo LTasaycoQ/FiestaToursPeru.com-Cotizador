@@ -130,7 +130,7 @@
 <body>
     <div class="header">
         <div class="title">Cotización {{ $quote->quote_number ?? 'N/A' }}</div>
-        <div class="subtitle">{{ $quote->name ?? 'Sin nombre' }} · {{ ucfirst($quote->status ?? 'draft') }}</div>
+        <div class="subtitle">{{ $quote->name ?? 'Sin nombre' }} · {{ $quote->status_label }}</div>
 
         <div class="meta">
             <div class="meta-row">

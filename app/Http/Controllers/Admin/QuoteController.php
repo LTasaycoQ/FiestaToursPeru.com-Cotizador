@@ -61,12 +61,12 @@ class QuoteController extends Controller
 
         $totalQuotes = Quote::count();
         $statusCounts = [
-            'draft' => Quote::where('status', 'draft')->count(),
-            'sent' => Quote::where('status', 'sent')->count(),
-            'approved' => Quote::where('status', 'approved')->count(),
-            'rejected' => Quote::where('status', 'rejected')->count(),
-            'expired' => Quote::where('status', 'expired')->count(),
-            'cancelled' => Quote::where('status', 'cancelled')->count(),
+            'Recibido' => Quote::where('status', 'Recibido')->count(),
+            'Enviado' => Quote::where('status', 'Enviado')->count(),
+            'Confirmado' => Quote::where('status', 'Confirmado')->count(),
+            'Reconfirmado' => Quote::where('status', 'Reconfirmado')->count(),
+            'Cancelado' => Quote::where('status', 'Cancelado')->count(),
+            'Borrador' => Quote::where('status', 'Borrador')->count(),
         ];
 
         return view('admin.quote.index', compact(
@@ -176,7 +176,7 @@ class QuoteController extends Controller
                 'id_contacts' => $request->id_contacts,
                 'id_labels' => $request->id_labels,
                 'id_language' => $request->id_language,
-                'status' => 'draft',
+                'status' => 'Borrador',
                 'days' => $dateMode === 'days' ? $request->days_count : null,
                 'start_date' => $dateMode === 'dates' ? $request->start_date : null,
                 'end_date' => $dateMode === 'dates' ? $request->end_date : null,
@@ -209,7 +209,7 @@ class QuoteController extends Controller
 
             return redirect()
                 ->route('admin.quotes.edit', $quote->id_quote)
-                ->with('success', '✅ Cotización creada. Ahora puedes registrar sus servicios.');
+                ->with('success');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -383,7 +383,7 @@ class QuoteController extends Controller
             'id_client' => 'nullable|exists:clients,id_client',
             'id_contacts' => 'nullable|exists:contacts,id_contacts',
             'id_language' => 'nullable|exists:languages,id_language',
-            'status' => 'nullable|in:draft,sent,approved,rejected,expired,cancelled',
+            'status' => 'nullable|in:Recibido,Enviado,Confirmado,Reconfirmado,Cancelado,Borrador',
             'start_date' => 'nullable|date',            'end_date' => 'nullable|date|after_or_equal:start_date',
             'expiration_date' => 'nullable|date|after_or_equal:start_date',
             'passengers_count' => 'nullable|integer|min:1',
@@ -461,7 +461,7 @@ class QuoteController extends Controller
             }
 
             $correlativeAssigned = false;
-            if ($newStatus === 'approved' && $oldStatus !== 'approved') {
+            if ($newStatus === 'Confirmado' && $oldStatus !== 'Confirmado') {
                 if (! $quote->start_date) {
                     throw new \Exception('La cotización debe tener una fecha de inicio para asignar el correlativo.');
                 }
@@ -1008,7 +1008,7 @@ class QuoteController extends Controller
             $newQuote = $quote->replicate();
             $newQuote->quote_number = $quoteNumber;
             $newQuote->name = $quote->name.' - Copia';
-            $newQuote->status = 'draft';
+            $newQuote->status = 'Borrador';
             $newQuote->correlative = null;
             $newQuote->correlative_assigned_at = null;
             $newQuote->subtotal = 0;
@@ -1435,31 +1435,40 @@ class QuoteController extends Controller
     public function changeStatus(Request $request, Quote $quote)
     {
         $status = $request->validate([
-            'status' => 'required|in:draft,sent,approved,rejected,expired,cancelled',
+            'status' => 'required|in:Recibido,Enviado,Confirmado,Reconfirmado,Cancelado,Borrador',
         ])['status'];
 
         $oldStatus = $quote->status;
-        $quote->status = $status;
-        $quote->save();
-
         $correlative = null;
-        if ($status === 'approved' && $oldStatus !== 'approved') {
+        if ($status === 'Confirmado' && $oldStatus !== 'Confirmado') {
             if (! $quote->start_date) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'La cotización debe tener una fecha de inicio para asignar el correlativo.',
+                    'message' => 'No se puede aprobar la cotización: primero debes definir una fecha de inicio.',
                 ], 422);
             }
 
-            $assigned = $quote->assignCorrelative();
-            $correlative = $quote->fresh()->correlative;
+            try {
+                DB::transaction(function () use ($quote, $status, &$correlative): void {
+                    $quote->update(['status' => $status]);
 
-            if (! $assigned || ! $correlative) {
+                    if (! $quote->assignCorrelative()) {
+                        throw new \RuntimeException('No se pudo generar el correlativo para la cotización aprobada.');
+                    }
+
+                    $correlative = $quote->fresh()->correlative;
+                    if (! $correlative) {
+                        throw new \RuntimeException('No se pudo generar el correlativo para la cotización aprobada.');
+                    }
+                });
+            } catch (\RuntimeException $exception) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No se pudo generar el correlativo para la cotización aprobada.',
+                    'message' => $exception->getMessage(),
                 ], 422);
             }
+        } else {
+            $quote->update(['status' => $status]);
         }
 
         return response()->json([

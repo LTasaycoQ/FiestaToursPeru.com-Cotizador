@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
             LabelsSeeder::class,
             ClientSeeder::class,
             ContactSeeder::class,
-            SupplierCategoriesSeeder::class,
             LanguageSeeder::class,
             CategorieSeeder::class,
+            SupplierCategoriesSeeder::class,
             SubCategoriesSeeder::class,
         ]);
     }

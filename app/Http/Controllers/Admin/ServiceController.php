@@ -10,8 +10,8 @@ use App\Models\Language;
 use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Models\ServiceDescription;
-use App\Models\SubCategory;
 use App\Models\ServiceImage;
+use App\Models\SubCategory;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,16 +68,21 @@ class ServiceController extends Controller
 
     public function importView()
     {
-        return view('admin.services.import');
+        $markets = Labels::where('status', 'active')
+            ->orderBy('name_labels')
+            ->get();
+
+        return view('admin.services.import', compact('markets'));
     }
 
     public function import(Request $request)
     {
         $request->validate([
             'archivo' => 'required|file|mimes:xlsx,xls|max:5120',
+            'id_labels' => 'required|exists:labels,id_labels',
         ]);
 
-        $import = new ServicesImport;
+        $import = new ServicesImport((int) $request->input('id_labels'));
 
         try {
             Excel::import($import, $request->file('archivo'));
@@ -274,7 +279,7 @@ class ServiceController extends Controller
 
         $uploaded = 0;
         foreach ($request->file('images') as $image) {
-            $path = $image->store('services/' . $service->id_service, 'public');
+            $path = $image->store('services/'.$service->id_service, 'public');
 
             $serviceImage = ServiceImage::create([
                 'id_service' => $service->id_service,
@@ -291,7 +296,7 @@ class ServiceController extends Controller
 
         return redirect()
             ->route('admin.tariffs.index', $service->id_service)
-            ->with('success', $uploaded . ' imagen(es) agregada(s) correctamente.');
+            ->with('success', $uploaded.' imagen(es) agregada(s) correctamente.');
     }
 
     public function destroy($id)

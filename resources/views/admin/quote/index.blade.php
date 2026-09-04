@@ -88,23 +88,18 @@
     border-radius: 50%;
 }
 
-.badge-status.draft { background: #f1f5f9; color: #475569; }
-.badge-status.draft .badge-dot { background: #94a3b8; }
-
-.badge-status.sent { background: #dbeafe; color: #1e40af; }
-.badge-status.sent .badge-dot { background: #3b82f6; }
-
-.badge-status.approved { background: #dcfce7; color: #166534; }
-.badge-status.approved .badge-dot { background: #22c55e; }
-
-.badge-status.rejected { background: #fee2e2; color: #991b1b; }
-.badge-status.rejected .badge-dot { background: #ef4444; }
-
-.badge-status.expired { background: #fef3c7; color: #92400e; }
-.badge-status.expired .badge-dot { background: #f59e0b; }
-
-.badge-status.cancelled { background: #f1f5f9; color: #64748b; }
-.badge-status.cancelled .badge-dot { background: #94a3b8; }
+.badge-status.Recibido { background: #dbeafe; color: #1e40af; }
+.badge-status.Recibido .badge-dot { background: #3b82f6; }
+.badge-status.Enviado { background: #fef3c7; color: #92400e; }
+.badge-status.Enviado .badge-dot { background: #f59e0b; }
+.badge-status.Confirmado { background: #dcfce7; color: #166534; }
+.badge-status.Confirmado .badge-dot { background: #22c55e; }
+.badge-status.Reconfirmado { background: #ede9fe; color: #6d28d9; }
+.badge-status.Reconfirmado .badge-dot { background: #8b5cf6; }
+.badge-status.Cancelado { background: #fee2e2; color: #991b1b; }
+.badge-status.Cancelado .badge-dot { background: #ef4444; }
+.badge-status.Borrador { background: #f1f5f9; color: #475569; }
+.badge-status.Borrador .badge-dot { background: #94a3b8; }
 
 /* ============================================================
    MENÚ DESPLEGABLE PARA CAMBIAR ESTADO
@@ -164,12 +159,12 @@
     flex-shrink: 0;
 }
 
-.quote-status-item.draft .status-dot { background: #94a3b8; }
-.quote-status-item.sent .status-dot { background: #3b82f6; }
-.quote-status-item.approved .status-dot { background: #22c55e; }
-.quote-status-item.rejected .status-dot { background: #ef4444; }
-.quote-status-item.expired .status-dot { background: #f59e0b; }
-.quote-status-item.cancelled .status-dot { background: #94a3b8; }
+.quote-status-item.Recibido .status-dot { background: #3b82f6; }
+.quote-status-item.Enviado .status-dot { background: #f59e0b; }
+.quote-status-item.Confirmado .status-dot { background: #22c55e; }
+.quote-status-item.Reconfirmado .status-dot { background: #8b5cf6; }
+.quote-status-item.Cancelado .status-dot { background: #ef4444; }
+.quote-status-item.Borrador .status-dot { background: #94a3b8; }
 
 /* ============================================================
    MENÚ DESPLEGABLE PARA ACCIONES (NUEVO)
@@ -660,12 +655,9 @@
                         <div class="filter-group">
                             <select id="statusFilter" class="form-control">
                                 <option value="">Todos los estados</option>
-                                <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Borrador</option>
-                                <option value="sent" {{ request('status') == 'sent' ? 'selected' : '' }}>Enviada</option>
-                                <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Aprobada</option>
-                                <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rechazada</option>
-                                <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Vencida</option>
-                                <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelada</option>
+                                @foreach(['Recibido', 'Enviado', 'Confirmado', 'Reconfirmado', 'Cancelado', 'Borrador'] as $quoteStatus)
+                                    <option value="{{ $quoteStatus }}" @selected(request('status') === $quoteStatus)>{{ $quoteStatus }}</option>
+                                @endforeach
                             </select>
                         </div>
                         <button id="btnApplyFilters" class="btn btn-secondary btn-apply-filters">
@@ -744,27 +736,27 @@
                                                   data-current-status="{{ $quote->status }}"
                                                   onclick="toggleStatusMenu(this, event)">
                                                 <span class="badge-dot"></span>
-                                                {{ ucfirst($quote->status) }}
+                                                {{ $quote->status_label }}
                                                 <i class="ti ti-chevron-down" style="font-size:10px; margin-left:4px;"></i>
                                             </span>
                                             <div class="quote-status-menu" data-id="{{ $quote->id_quote }}">
-                                                <button type="button" class="quote-status-item draft" data-status="draft" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'draft', event)">
+                                                <button type="button" class="quote-status-item Borrador" data-status="Borrador" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Borrador', event)">
                                                     <span class="status-dot"></span> Borrador
                                                 </button>
-                                                <button type="button" class="quote-status-item sent" data-status="sent" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'sent', event)">
-                                                    <span class="status-dot"></span> Enviada
+                                                <button type="button" class="quote-status-item Recibido" data-status="Recibido" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Recibido', event)">
+                                                    <span class="status-dot"></span> Recibido
                                                 </button>
-                                                <button type="button" class="quote-status-item approved" data-status="approved" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'approved', event)">
-                                                    <span class="status-dot"></span> Aprobada
+                                                <button type="button" class="quote-status-item Enviado" data-status="Enviado" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Enviado', event)">
+                                                    <span class="status-dot"></span> Enviado
                                                 </button>
-                                                <button type="button" class="quote-status-item rejected" data-status="rejected" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'rejected', event)">
-                                                    <span class="status-dot"></span> Rechazada
+                                                <button type="button" class="quote-status-item Confirmado" data-status="Confirmado" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Confirmado', event)">
+                                                    <span class="status-dot"></span> Confirmado
                                                 </button>
-                                                <button type="button" class="quote-status-item expired" data-status="expired" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'expired', event)">
-                                                    <span class="status-dot"></span> Vencida
+                                                <button type="button" class="quote-status-item Reconfirmado" data-status="Reconfirmado" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Reconfirmado', event)">
+                                                    <span class="status-dot"></span> Reconfirmado
                                                 </button>
-                                                <button type="button" class="quote-status-item cancelled" data-status="cancelled" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'cancelled', event)">
-                                                    <span class="status-dot"></span> Cancelada
+                                                <button type="button" class="quote-status-item Cancelado" data-status="Cancelado" onclick="changeQuoteStatus(this, {{ $quote->id_quote }}, 'Cancelado', event)">
+                                                    <span class="status-dot"></span> Cancelado
                                                 </button>
                                             </div>
                                         </div>
@@ -1128,13 +1120,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dropdown) dropdown.classList.remove('show');
 
         var statusLabels = {
-            'draft': 'Borrador', 'sent': 'Enviada', 'approved': 'Aprobada',
-            'rejected': 'Rechazada', 'expired': 'Vencida', 'cancelled': 'Cancelada'
+            'Recibido': 'Recibido', 'Enviado': 'Enviado', 'Confirmado': 'Confirmado',
+            'Reconfirmado': 'Reconfirmado', 'Cancelado': 'Cancelado', 'Borrador': 'Borrador'
         };
 
         var newStatusLabel = statusLabels[newStatus] || newStatus;
 
-        if (newStatus === 'approved' || newStatus === 'rejected' || newStatus === 'cancelled') {
+        if (newStatus === 'Confirmado' || newStatus === 'Reconfirmado' || newStatus === 'Cancelado') {
             safeConfirm(
                 '¿Cambiar estado?',
                 'Estás a punto de cambiar el estado a "' + newStatusLabel + '". ¿Estás seguro?',
@@ -1200,7 +1192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             } else {
-                var currentStatus = badge ? badge.dataset.currentStatus : 'draft';
+                var currentStatus = badge ? badge.dataset.currentStatus : 'Borrador';
                 if (badge) {
                     badge.className = 'badge-status ' + currentStatus;
                     badge.innerHTML = '<span class="badge-dot"></span> ' +
@@ -1214,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (badge) {
                 badge.style.opacity = '1';
                 badge.style.pointerEvents = 'auto';
-                var currentStatus = badge.dataset.currentStatus || 'draft';
+                var currentStatus = badge.dataset.currentStatus || 'Borrador';
                 badge.className = 'badge-status ' + currentStatus;
                 badge.innerHTML = '<span class="badge-dot"></span> ' +
                     capitalizeFirstLetter(currentStatus) +

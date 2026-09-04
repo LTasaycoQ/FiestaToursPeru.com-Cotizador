@@ -28,9 +28,10 @@ return new class extends Migration
             $table->timestamp('correlative_assigned_at')->nullable()
                 ->comment('Fecha cuando se asignó el número de file');
 
-            $table->enum('status', ['draft', 'sent', 'approved', 'rejected', 'expired', 'cancelled'])
-                ->default('draft')
+            $table->enum('status', ['Recibido', 'Enviado','Confirmado', 'Reconfirmado', 'Cancelado', 'Borrador'])
+                ->default('Recibido')
                 ->comment('Estado de la cotización');
+
 
             $table->string('pricing_mode', 20)->nullable()->comment('Modo de cotización: por persona, por habitación, por grupo, etc.');
             $table->integer('days')->nullable()->comment('Número de días');

@@ -33,6 +33,8 @@ class ServicesImport implements SkipsEmptyRows, ToCollection
 
     public array $errors = [];
 
+    public function __construct(private readonly int $marketId) {}
+
     public function collection(Collection $rows): void
     {
         if ($rows->count() < 2) {
@@ -74,7 +76,12 @@ class ServicesImport implements SkipsEmptyRows, ToCollection
 
             $service = Service::updateOrCreate(
                 ['id_supplier' => $supplier->id_supplier, 'name_service' => $serviceName],
-                ['id_category' => $category->id_category, 'pricing_type' => 'tiered', 'status' => 'active']
+                [
+                    'id_category' => $category->id_category,
+                    'id_labels' => $this->marketId,
+                    'pricing_type' => 'tiered',
+                    'status' => 'active',
+                ]
             );
             $this->imported++;
 

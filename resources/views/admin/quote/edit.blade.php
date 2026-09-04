@@ -30,12 +30,12 @@
 
 .badge-status { padding: 6px 14px 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; text-transform: capitalize; white-space: nowrap; }
 .badge-status .badge-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.badge-status.draft { background: var(--qe-line-soft); color: var(--qe-ink-700); } .badge-status.draft .badge-dot { background: var(--qe-ink-300); }
-.badge-status.sent { background: #dbeafe; color: #1e40af; } .badge-status.sent .badge-dot { background: #3b82f6; }
-.badge-status.approved { background: var(--qe-success-bg); color: var(--qe-success-text); } .badge-status.approved .badge-dot { background: #22c55e; }
-.badge-status.rejected { background: var(--qe-danger-bg); color: var(--qe-danger-text); } .badge-status.rejected .badge-dot { background: var(--qe-danger); }
-.badge-status.expired { background: var(--qe-warning-bg); color: var(--qe-warning-text); } .badge-status.expired .badge-dot { background: #f59e0b; }
-.badge-status.cancelled { background: var(--qe-line-soft); color: var(--qe-ink-500); } .badge-status.cancelled .badge-dot { background: var(--qe-ink-300); }
+.badge-status.Recibido { background: #dbeafe; color: #1e40af; } .badge-status.Recibido .badge-dot { background: #3b82f6; }
+.badge-status.Enviado { background: #fef3c7; color: #92400e; } .badge-status.Enviado .badge-dot { background: #f59e0b; }
+.badge-status.Confirmado { background: var(--qe-success-bg); color: var(--qe-success-text); } .badge-status.Confirmado .badge-dot { background: #22c55e; }
+.badge-status.Reconfirmado { background: #ede9fe; color: #6d28d9; } .badge-status.Reconfirmado .badge-dot { background: #8b5cf6; }
+.badge-status.Cancelado { background: var(--qe-danger-bg); color: var(--qe-danger-text); } .badge-status.Cancelado .badge-dot { background: var(--qe-danger); }
+.badge-status.Borrador { background: var(--qe-line-soft); color: var(--qe-ink-700); } .badge-status.Borrador .badge-dot { background: var(--qe-ink-300); }
 
 .qe-card .btn { padding: 9px 18px; border-radius: var(--qe-radius-sm); font-weight: 600; font-size: 13px; transition: all .15s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid transparent; cursor: pointer; line-height: 1.3; }
 .btn-secondary { background: var(--qe-surface-muted); color: var(--qe-ink-700); border-color: var(--qe-line); }
@@ -1176,17 +1176,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             @endforeach
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="filter_language_list">Mercado</label>
-                        <select class="form-control" id="filter_language_list" onchange="filterServiceList()">
-                            <option value="">Mercado: {{ $quote->market?->name_labels ?? 'No definido' }}</option>
-                            @foreach($labels as $label)
-                                @if((int) $label->id_labels === (int) $quote->id_labels)
-                                    <option value="{{ $label->id_labels }}" selected>{{ $label->name_labels }}</option>
-                                @endif
-                            @endforeach
-                        </select>
-                    </div>
+                  
                     <div class="form-group">
                         <label for="filter_category_list">Categoría</label>
                         <select class="form-control" id="filter_category_list" onchange="filterServiceList()">
@@ -1222,16 +1212,8 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             @endphp
                             @foreach($services as $service)
                                                         @php
-                                                            $isAcc = false;
-                                                            if (isset($service->category) && !empty($service->category->is_accommodation) && $service->category->is_accommodation) {
-                                                                $isAcc = true;
-                                                            } else {
-                                                                $hay = strtolower(($service->name_service ?? '') . ' ' . ($service->supplier->supplier_name ?? ''));
-                                                                $keywords = ['hotel','hosped','alojam','room','habitaci','hostel','resort','suite','lodging'];
-                                                                foreach ($keywords as $kw) {
-                                                                    if (strpos($hay, $kw) !== false) { $isAcc = true; break; }
-                                                                }
-                                                            }
+                                                            // Solo la categoría define si el servicio es alojamiento.
+                                                            $isAcc = (bool) ($service->category?->is_accommodation ?? false);
                                                         @endphp
                                                         <tr class="service-row" data-supplier="{{ $service->id_supplier }}" data-language="{{ $service->id_labels }}" data-category="{{ $service->id_category }}" data-is-accommodation="{{ $isAcc ? '1' : '0' }}" style="border-bottom: 1px solid var(--qe-line);">
                                                             <td style="padding: 10px 12px; color: var(--qe-ink-500);">{{ $service->supplier->supplier_name ?? '-' }}</td>
@@ -1371,16 +1353,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                         <tbody id="accommodationListTableBody">
                             @foreach($accommodationServices as $service)
                                 @php
-                                    $isAcc = false;
-                                    if (isset($service->category) && !empty($service->category->is_accommodation) && $service->category->is_accommodation) {
-                                        $isAcc = true;
-                                    } else {
-                                        $hay = strtolower(($service->name_service ?? '') . ' ' . ($service->supplier->supplier_name ?? ''));
-                                        $keywords = ['hotel','hosped','alojam','room','habitaci','hostel','resort','suite','lodging'];
-                                        foreach ($keywords as $kw) {
-                                            if (strpos($hay, $kw) !== false) { $isAcc = true; break; }
-                                        }
-                                    }
+                                    $isAcc = (bool) ($service->category?->is_accommodation ?? false);
                                 @endphp
                                 @if($isAcc)
                                     <tr class="accommodation-row" data-service-id="{{ $service->id_service }}" data-category="{{ $service->id_category ?? '' }}" data-search="{{ strtolower($service->name_service ?? '') }} {{ strtolower($service->supplier->supplier_name ?? '') }}" style="border-bottom:1px solid var(--qe-line);">

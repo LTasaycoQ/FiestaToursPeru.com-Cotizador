@@ -16,7 +16,7 @@ class SupplierCategoriesSeeder extends Seeder
         ];
 
         foreach ($suppliersCategories as $s) {
-            DB::table('service_category')->insert([
+            DB::table('categories_suppliers')->insert([
                 'category_name' => $s['category_name'],
                 'created_at' => now(),
                 'updated_at' => now(),
