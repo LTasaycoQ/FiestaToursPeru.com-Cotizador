@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DetailQuote extends Model
 {
     protected $table = 'detail_quote';
+
     protected $primaryKey = 'id_detail_quote';
 
     protected $fillable = [
@@ -17,6 +18,7 @@ class DetailQuote extends Model
         'id_supplier',
         'quantity',
         'notes',
+        'is_optional',
         'unit_price',
         'subtotal',
     ];
@@ -25,6 +27,7 @@ class DetailQuote extends Model
         'unit_price' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'quantity' => 'integer',
+        'is_optional' => 'boolean',
     ];
 
     // ============================================================

@@ -258,7 +258,7 @@ class Quote extends Model
 
     public function calculateTotals(int $accommodationOption = 1): void
     {
-        $itineraryTotal = $this->details()->sum('subtotal');
+        $itineraryTotal = $this->details()->where('is_optional', false)->sum('subtotal');
         $checkoutDay = $this->quoteDays()->max('day_number');
         $accommodationTotal = $this->accommodations()
             ->where('option_number', $accommodationOption)
@@ -272,7 +272,7 @@ class Quote extends Model
 
     public function getTotalsByOption(): array
     {
-        $itineraryTotal = $this->details()->sum('subtotal');
+        $itineraryTotal = $this->details()->where('is_optional', false)->sum('subtotal');
         $checkoutDay = $this->quoteDays()->max('day_number');
 
         return [

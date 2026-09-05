@@ -181,7 +181,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($day->details as $detail)
+                            @forelse($day->details->where('is_optional', false) as $detail)
                                 <tr>
                                     <td>{{ $detail->service?->name_service ?? 'Servicio eliminado' }}</td>
                                     <td>{{ $detail->supplier?->supplier_name ?? '-' }}</td>

@@ -709,6 +709,10 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                     <button type="button" class="btn btn-secondary btn-sm" onclick="openServiceNotes({{ $detail->id_detail_quote }}, '{{ addslashes($detail->notes ?? '') }}')" title="Agregar nota al servicio">
                                                         <i class="ti ti-note"></i> Notas
                                                     </button>
+                                                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#7c3aed;white-space:nowrap;">
+                                                        <input type="checkbox" id="detail-optional-{{ $detail->id_detail_quote }}" {{ $detail->is_optional ? 'checked' : '' }} onchange="toggleOptionalService({{ $detail->id_detail_quote }}, this.checked)">
+                                                        Opcional
+                                                    </label>
                                                     <button type="button" class="btn btn-danger btn-icon btn-sm" onclick="removeService({{ $detail->id_detail_quote }})" title="Eliminar">
                                                         <i class="ti ti-trash"></i>
                                                     </button>
@@ -1697,6 +1701,7 @@ function syncDetailPrice(detailId) {
     const tariffSelect = document.getElementById(`detail-tariff-${detailId}`);
     const priceInput = document.getElementById(`detail-price-${detailId}`);
     const quantityInput = document.getElementById(`detail-quantity-${detailId}`);
+    const optionalInput = document.getElementById(`detail-optional-${detailId}`);
     const subtotalEl = document.getElementById(`detail-subtotal-${detailId}`);
     const selectedOption = tariffSelect ? tariffSelect.options[tariffSelect.selectedIndex] : null;
 
@@ -1774,6 +1779,7 @@ function updateServiceDetail(detailId, options = {}) {
     }
     formData.append('unit_price', unitPrice.toFixed(2));
     formData.append('quantity', quantity);
+    formData.append('is_optional', optionalInput && optionalInput.checked ? '1' : '0');
 
     fetch(UPDATE_SERVICE_URL_BASE.replace('__ID__', detailId), {
         method: 'POST',
@@ -1808,6 +1814,28 @@ function updateServiceDetail(detailId, options = {}) {
                 saveButton.disabled = false;
                 saveButton.innerHTML = originalHtml;
             }
+        });
+}
+
+function toggleOptionalService(detailId, isOptional) {
+    const formData = new FormData();
+    formData.append('_token', CSRF_TOKEN);
+    formData.append('_method', 'PUT');
+    formData.append('is_optional', isOptional ? '1' : '0');
+
+    fetch(UPDATE_SERVICE_URL_BASE.replace('__ID__', detailId), {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': CSRF_TOKEN, 'Accept': 'application/json' },
+        body: formData
+    })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok || !data.success) throw new Error(data.message || 'No se pudo actualizar el estado.');
+            Swal.fire({ icon: 'success', title: isOptional ? 'Servicio opcional' : 'Servicio incluido', timer: 1000, showConfirmButton: false });
+        })
+        .catch(error => {
+            document.getElementById(`detail-optional-${detailId}`).checked = !isOptional;
+            Swal.fire({ icon: 'error', title: 'Error', text: error.message });
         });
 }
 
@@ -1909,6 +1937,7 @@ function renderServiceCart() {
     container.innerHTML = serviceCart.map((item, index) => `
         <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 9px; background:#fff; border:1px solid var(--qe-line); border-radius:6px;">
             ${escapeHtml(item.name)}${item.tariffName ? ` — ${escapeHtml(item.tariffName)}` : ''}
+            <label style="font-size:11px;color:#7c3aed;"><input type="checkbox" ${item.isOptional ? 'checked' : ''} onchange="serviceCart[${index}].isOptional = this.checked"> Opcional</label>
             <button type="button" class="btn btn-danger btn-sm" style="padding:2px 5px;" onclick="removeFromServiceCart(${index})">×</button>
         </span>
     `).join('');
@@ -1949,6 +1978,7 @@ function saveServiceCart() {
         formData.append('day_number', currentDayNumberList);
         formData.append('id_service', items[index].serviceId);
         formData.append('quantity', {{ (int) ($quote->passengers_count ?: 1) }});
+        formData.append('is_optional', items[index].isOptional ? '1' : '0');
         if (items[index].tariffId) formData.append('id_tariff', items[index].tariffId);
 
         fetch(ADD_SERVICE_URL, {
@@ -2021,6 +2051,7 @@ function addServiceFromList(serviceId, serviceName, button) {
             name: serviceName,
             tariffId: tariffSelect.value,
             tariffName: selectedTariff.value ? selectedTariff.text : '',
+            isOptional: false,
         });
         renderServiceCart();
         button.innerHTML = '<i class="ti ti-check"></i> Seleccionado';

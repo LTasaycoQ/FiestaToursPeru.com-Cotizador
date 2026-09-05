@@ -185,7 +185,7 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
                 ...array_fill(0, 13, ''),
             ]);
 
-            foreach ($day->details->unique('id_service') as $detail) {
+            foreach ($day->details->where('is_optional', false)->unique('id_service') as $detail) {
                 $serviceRow = $this->serviceRow(
                     $detail->service?->name_service ?? 'Servicio eliminado',
                     $detail->service?->tariffs?->where('status', 'active') ?? collect(),

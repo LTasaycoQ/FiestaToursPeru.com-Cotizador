@@ -1200,6 +1200,7 @@ class QuoteController extends Controller
             'id_service' => 'required|exists:service,id_service',
             'id_tariff' => 'nullable|exists:tariff,id_tariff',
             'quantity' => 'nullable|integer|min:1',
+            'is_optional' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -1254,6 +1255,7 @@ class QuoteController extends Controller
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'subtotal' => $unitPrice * $quantity,
+                    'is_optional' => $request->boolean('is_optional'),
                 ]
             );
 
@@ -1309,11 +1311,15 @@ class QuoteController extends Controller
             'unit_price' => 'nullable|numeric|min:0',
             'quantity' => 'nullable|integer|min:1',
             'notes' => 'nullable|string|max:600',
+            'is_optional' => 'nullable|boolean',
         ]);
 
         $updateData = [];
         if ($request->has('notes')) {
             $updateData['notes'] = trim((string) $request->input('notes')) === '' ? null : trim((string) $request->input('notes'));
+        }
+        if ($request->has('is_optional')) {
+            $updateData['is_optional'] = $request->boolean('is_optional');
         }
 
         $quantity = (int) ($request->filled('quantity') ? ($data['quantity'] ?? $detail->quantity ?? $quote->passengers_count ?? 1) : ($detail->quantity ?? $quote->passengers_count ?? 1));

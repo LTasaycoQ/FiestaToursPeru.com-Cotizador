@@ -59,6 +59,9 @@ class QuoteDetailExport implements FromCollection, WithEvents, WithHeadings, Wit
 
         foreach ($quote->quoteDays->sortBy('day_number') as $day) {
             foreach ($day->details->sortBy('id_detail_quote') as $detail) {
+                if ($detail->is_optional) {
+                    continue;
+                }
                 $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
                 $unitPrice = (float) ($detail->unit_price ?? 0);
 

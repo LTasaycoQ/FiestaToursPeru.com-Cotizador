@@ -72,7 +72,7 @@ class QuoteDocxExport
             }
 
             foreach ($details as $detail) {
-                $serviceName = $detail->service?->name_service ?? 'Servicio eliminado';
+                $serviceName = ($detail->is_optional ? 'OPCIONAL - ' : '').($detail->service?->name_service ?? 'Servicio eliminado');
                 $description = $this->extractDescription($detail->service, $quote->id_language);
                 $notes = trim((string) ($detail->notes ?? ''));
 
@@ -84,7 +84,7 @@ class QuoteDocxExport
                     'unit' => 'pct',
                     'alignment' => 'left',
                 ]);
-                
+
                 $table->addRow();
 
                 $serviceCell = $table->addCell(10000);
@@ -123,14 +123,11 @@ class QuoteDocxExport
 
         }
 
-
         $tempPath = Storage::disk('local')->path('temp/quote-'.$this->quoteId.'.docx');
         $directory = dirname($tempPath);
         if (! is_dir($directory)) {
             mkdir($directory, 0777, true);
         }
-
-        
 
         $writer = IOFactory::createWriter($phpWord, 'Word2007');
         $writer->save($tempPath);
