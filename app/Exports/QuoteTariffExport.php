@@ -200,7 +200,7 @@ class QuoteTariffExport implements FromCollection, WithEvents, WithHeadings, Wit
             }
         }
 
-        $rows->push(['Cargo por Servicios', ...array_fill(0, 13, '10')]);
+        $rows->push(['Cargo por Servicios', ...array_fill(0, 13, (string) $quote->serviceChargePerPassenger())]);
         $rows->push(['Total servicios', ...$totals]);
         $rows->push(array_fill(0, 14, ''));
         $rows->push(['TARIFAS DE HOTELES', ...array_fill(0, 13, '')]);

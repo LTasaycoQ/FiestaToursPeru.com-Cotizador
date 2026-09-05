@@ -74,6 +74,12 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 .form-control.is-invalid { border-color: var(--qe-danger); }
 .invalid-feedback { display: block; font-size: 12px; color: var(--qe-danger); margin-top: 5px; }
 .field-hint { font-size: 11.5px; color: var(--qe-ink-300); margin-top: 5px; }
+.service-charge-card { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:16px 18px; margin:18px 0 4px; border:1px solid #bfdbfe; border-radius:var(--qe-radius-md); background:linear-gradient(135deg,#eff6ff,#f8fafc); }
+.service-charge-card__title { display:flex; align-items:center; gap:10px; color:#1e3a8a; font-size:13px; font-weight:700; }
+.service-charge-card__title i { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; background:#dbeafe; color:#2563eb; font-size:17px; }
+.service-charge-card__meta { margin:3px 0 0 40px; color:var(--qe-ink-500); font-size:11.5px; }
+.service-charge-card__value { color:#1e3a8a; font-size:18px; font-weight:800; white-space:nowrap; }
+@media (max-width: 576px) { .service-charge-card { align-items:flex-start; flex-direction:column; gap:8px; } .service-charge-card__value { align-self:flex-end; } }
 
 .alert { padding: 13px 16px; border-radius: var(--qe-radius-md); margin-bottom: 16px; font-size: 13.5px; border: 1px solid transparent; }
 .alert-success { background: var(--qe-success-bg); border-color: var(--qe-success-border); color: var(--qe-success-text); }
@@ -460,6 +466,7 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                             {{-- <a href="{{ route('admin.quotes.show', $quote->id_quote) }}" class="btn btn-secondary">Cancelar</a> --}}
                         </div>
                     </form>
+
                     </div>
 
                     <div class="form-actions quote-itinerary-action" style="margin-top: 12px;">
@@ -612,6 +619,26 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
 
                     <div class="quote-main-panel active" id="quote-tab-itinerary">
                     <div class="itinerary-section">
+                        @php
+                            $serviceChargeDestinations = $quote->destinationCount();
+                            $serviceChargePerPassenger = $quote->serviceChargePerPassenger();
+                            $serviceChargeTotal = $quote->serviceChargeTotal();
+                            $serviceChargePassengers = (int) ($quote->passengers_count ?: 1);
+                        @endphp
+                        <div class="service-charge-card" aria-label="Cargo por servicio calculado">
+                            <div>
+                                <div class="service-charge-card__title">
+                                    <i class="ti ti-receipt-dollar"></i>
+                                    Cargo por servicio
+                                </div>
+                                <div class="service-charge-card__meta">
+                                    {{ $serviceChargeDestinations }} {{ $serviceChargeDestinations === 1 ? 'proveedor detectado' : 'proveedores detectados' }}
+                                    · USD {{ number_format($serviceChargePerPassenger, 2) }} por pasajero
+                                    · {{ $serviceChargePassengers }} pasajeros
+                                </div>
+                            </div>
+                            <div class="service-charge-card__value">USD {{ number_format($serviceChargeTotal, 2) }}</div>
+                        </div>
                         <div class="itinerary-header">
                             <h4 class="title">
                                 <i class="ti ti-route"></i> Itinerario

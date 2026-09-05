@@ -259,13 +259,14 @@ class Quote extends Model
     public function calculateTotals(int $accommodationOption = 1): void
     {
         $itineraryTotal = $this->details()->where('is_optional', false)->sum('subtotal');
+        $serviceChargeTotal = $this->serviceChargeTotal();
         $checkoutDay = $this->quoteDays()->max('day_number');
         $accommodationTotal = $this->accommodations()
             ->where('option_number', $accommodationOption)
             ->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))
             ->sum('subtotal');
 
-        $this->subtotal = $itineraryTotal + $accommodationTotal;
+        $this->subtotal = $itineraryTotal + $accommodationTotal + $serviceChargeTotal;
         $this->total = $this->subtotal;
         $this->save();
     }
@@ -273,12 +274,40 @@ class Quote extends Model
     public function getTotalsByOption(): array
     {
         $itineraryTotal = $this->details()->where('is_optional', false)->sum('subtotal');
+        $serviceChargeTotal = $this->serviceChargeTotal();
         $checkoutDay = $this->quoteDays()->max('day_number');
 
         return [
-            1 => $itineraryTotal + $this->accommodations()->where('option_number', 1)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
-            2 => $itineraryTotal + $this->accommodations()->where('option_number', 2)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
+            1 => $itineraryTotal + $serviceChargeTotal + $this->accommodations()->where('option_number', 1)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
+            2 => $itineraryTotal + $serviceChargeTotal + $this->accommodations()->where('option_number', 2)->when($checkoutDay, fn ($query) => $query->whereHas('quoteDay', fn ($dayQuery) => $dayQuery->where('day_number', '<', $checkoutDay)))->sum('subtotal'),
         ];
+    }
+
+    public function destinationCount(): int
+    {
+        $this->loadMissing('quoteDays.details.service');
+
+        return $this->quoteDays
+            ->flatMap(fn (QuoteDay $day) => $day->details
+                ->where('is_optional', false)
+                ->map(fn (DetailQuote $detail) => $detail->service?->id_supplier))
+            ->filter()
+            ->unique()
+            ->count();
+    }
+
+    public function serviceChargePerPassenger(): float
+    {
+        return match (true) {
+            $this->destinationCount() === 1 => 5.0,
+            $this->destinationCount() > 1 => 10.0,
+            default => 0.0,
+        };
+    }
+
+    public function serviceChargeTotal(): float
+    {
+        return $this->serviceChargePerPassenger() * (int) ($this->passengers_count ?: 1);
     }
 
     public function getTariffForService(Service $service, int $passengersCount): ?Tariff
