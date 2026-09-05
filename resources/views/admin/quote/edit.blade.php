@@ -665,6 +665,8 @@ textarea.form-control { height: auto; min-height: 84px; padding-top: 10px; resiz
                                                         <span class="category" style="font-size:12px; color: red; font-weight:600;">
                                                             {{ $detail->notes ?? '' }}
                                                     </div>
+                                                    <span id="optional-feedback-{{ $detail->id_detail_quote }}" aria-live="polite" style="font-size:11px;color:var(--qe-success-text);opacity:0;transition:opacity .2s ease;"></span>
+
                                                 </div>
                                                 <div class="actions">
                                                     @if($quoteHasPassengers)
@@ -1831,7 +1833,14 @@ function toggleOptionalService(detailId, isOptional) {
         .then(response => response.json().then(data => ({ ok: response.ok, data })))
         .then(({ ok, data }) => {
             if (!ok || !data.success) throw new Error(data.message || 'No se pudo actualizar el estado.');
-            Swal.fire({ icon: 'success', title: isOptional ? 'Servicio opcional' : 'Servicio incluido', timer: 1000, showConfirmButton: false });
+            const feedback = document.getElementById(`optional-feedback-${detailId}`);
+            if (feedback) {
+                feedback.innerHTML = '<i class="ti ti-check"></i> Guardado';
+                feedback.style.opacity = '1';
+                window.setTimeout(() => {
+                    feedback.style.opacity = '0';
+                }, 1400);
+            }
         })
         .catch(error => {
             document.getElementById(`detail-optional-${detailId}`).checked = !isOptional;
